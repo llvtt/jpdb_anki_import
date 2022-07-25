@@ -59,7 +59,7 @@ class Vocabulary:
 def main():
     vocab = Vocabulary.parse('../vocabulary-reviews.json')
     vocab.sort(key=lambda x: x.spelling)
-    for v in vocab[:5]:
+    for v in vocab:
         print(v)
 
 

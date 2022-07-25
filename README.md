@@ -1,11 +1,6 @@
-## Process
+## Issues
 
-* parse jpdb review file into vocab/review history
-* create basic anki models for each vocab:
-    - model selection
-    - note
-    - cards
-    - templates?
-* populate review log
-    - use review history from jpdb to populat Anki revlog
-    - MVP: use custom algo to determine latest revlog entry for Anki
+* Allow customize note type
+* Deal with importing history for J=>E and E=>J separately
+* Import custom sentences?
+* Manual for how to add audio, sentences, rich media

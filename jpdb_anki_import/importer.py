@@ -8,7 +8,7 @@ from . import jpdb
 
 
 # TODO: these are just test values but should be customizable
-NOTE_TYPE = 'basic'
+NOTE_TYPE = 'Basic'
 DECK_NAME = 'Default'
 
 
@@ -36,7 +36,12 @@ def create_note(vocab: jpdb.Vocabulary):
 
 def backfill_reviews(note: Note, vocab: jpdb.Vocabulary):
     # Assume there is only 1 card
-    card = note.cards()[0]
+    cards = note.cards()
+    if len(cards) > 1:
+        types = ', '.join(str(c.type) for c in cards)
+        raise Exception(f'why is there more than 1 card???? {types}')
+    card = cards[0]
+
     for review in vocab.reviews:
         # TODO: is there a safer way to do this?
         states = mw.col._backend.get_next_card_states(card.id)
@@ -68,7 +73,7 @@ def create_notes(vocabulary: list[jpdb.Vocabulary]):
     notes_created = 0
     for vocab in vocabulary:
         note = create_note(vocab)
-        if create_note(vocab):
+        if note:
             notes_created += 1
             backfill_reviews(note, vocab)
 
