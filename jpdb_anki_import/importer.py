@@ -1,15 +1,11 @@
 """
 Create Notes and Cards in Anki for JPDB vocabulary cards.
 """
+from anki.cards import Card
 from anki.notes import Note
 from anki.scheduler.v3 import CardAnswer
 from aqt import mw
 from . import jpdb
-
-
-# TODO: these are just test values but should be customizable
-NOTE_TYPE = 'Basic'
-DECK_NAME = 'Default'
 
 
 JPDB_TO_CARD_ANSWER = {
@@ -24,29 +20,39 @@ JPDB_TO_CARD_ANSWER = {
 }
 
 
-def create_note(vocab: jpdb.Vocabulary):
-    basic_model = mw.col.models.by_name(NOTE_TYPE)
-    note = mw.col.new_note(basic_model)
-    note.fields[0] = vocab.spelling
-    note.fields[1] = vocab.reading
-    mw.col.add_note(note, mw.col.decks.id_for_name(DECK_NAME))
+class JPDBImporter:
+    def __init__(self, config):
+        self.note_type = config['noteType']
+        self.deck_name = config['deckName']
+        self.expression_field = config['expressionField']
+        self.reading_field = config['readingField']
 
-    return note
+    def create_note(self, vocab: jpdb.Vocabulary):
+        # TODO: something odd seems to be going on here when we add new notes
+        # across _different_ decks.
+        # TODO: I think this may have to do with the fact that the first field in a note is used internally by Anki as the ID.
+        note_model = mw.col.models.by_name(self.note_type) or mw.col.models.current()
+        note = mw.col.new_note(note_model)
 
+        if self.expression_field in note:
+            note[self.expression_field] = vocab.spelling
+        else:
+            note.fields[0] = vocab.spelling
 
-def backfill_reviews(note: Note, vocab: jpdb.Vocabulary):
-    # Assume there is only 1 card
-    cards = note.cards()
-    if len(cards) > 1:
-        types = ', '.join(str(c.type) for c in cards)
-        raise Exception(f'why is there more than 1 card???? {types}')
-    card = cards[0]
+        if self.reading_field in note:
+            note[self.reading_field] = vocab.reading
+        else:
+            note.fields[1] = vocab.reading
 
-    for review in vocab.reviews:
+        mw.col.add_note(note, mw.col.decks.id_for_name(self.deck_name))
+
+        return note
+
+    @staticmethod
+    def card_state_current_next(card: Card, rating: str):
+        # The following code is taken directly from the Anki v3 scheduler
         # TODO: is there a safer way to do this?
         states = mw.col._backend.get_next_card_states(card.id)
-
-        rating = JPDB_TO_CARD_ANSWER[review.grade]
         if rating == CardAnswer.AGAIN:
             new_state = states.again
         elif rating == CardAnswer.HARD:
@@ -58,28 +64,31 @@ def backfill_reviews(note: Note, vocab: jpdb.Vocabulary):
         else:
             raise Exception("invalid rating")
 
-        card_answer = CardAnswer(
-            card_id=card.id,
-            current_state=states.current,
-            new_state=new_state,
-            rating=rating,
-            answered_at_millis=int(review.timestamp.timestamp() * 1000),
-            milliseconds_taken=1000,
-        )
-        mw.col.sched.answer_card(card_answer)
+        return states.current, new_state
 
+    def backfill_reviews(self, note: Note, vocab: jpdb.Vocabulary):
+        # Assume there is only 1 card
+        card = note.cards()[0]
 
-def create_notes(vocabulary: list[jpdb.Vocabulary]):
-    notes_created = 0
-    for vocab in vocabulary:
-        note = create_note(vocab)
-        if note:
-            notes_created += 1
-            backfill_reviews(note, vocab)
+        for review in vocab.reviews:
+            rating = JPDB_TO_CARD_ANSWER[review.grade]
+            current_state, new_state = self.card_state_current_next(card, rating)
+            card_answer = CardAnswer(
+                card_id=card.id,
+                current_state=current_state,
+                new_state=new_state,
+                rating=rating,
+                answered_at_millis=review.timestamp * 1000,
+                milliseconds_taken=1000,
+            )
+            mw.col.sched.answer_card(card_answer)
 
-    return notes_created
+    def create_notes(self, vocabulary: list[jpdb.Vocabulary]):
+        notes_created = 0
+        for vocab in vocabulary:
+            note = self.create_note(vocab)
+            if note:
+                notes_created += 1
+                self.backfill_reviews(note, vocab)
 
-
-def create_model():
-    # TODO: allow the user to select a model and how to map that to JPDB.
-    pass
+        return notes_created

@@ -1,30 +1,33 @@
+import dataclasses
 import datetime
 import json
 
 
+@dataclasses.dataclass
 class Review:
-    def __init__(self, timestamp, grade):
-        self.grade = grade
-        self.timestamp = datetime.datetime.fromtimestamp(timestamp)
+    grade: str
+    timestamp: int
 
     @classmethod
     def from_dict(cls, d):
         return cls(timestamp=d['timestamp'], grade=d['grade'])
 
-    def __repr__(self):
-        return f"Review('{self.grade}', {self.timestamp})"
 
-
+@dataclasses.dataclass
 class Vocabulary:
-    def __init__(self, vid, spelling, reading, reviews):
-        self.vid = vid
-        self.spelling = spelling
-        self.reading = reading
-        self.reviews = self._build_reviews(reviews)
+    vid: int
+    spelling: str
+    reading: str
+    reviews: list[Review]
 
     @classmethod
     def from_dict(cls, d):
-        return cls(vid=d['vid'], spelling=d['spelling'], reading=d['reading'], reviews=d['reviews'])
+        return cls(
+            vid=d['vid'],
+            spelling=d['spelling'],
+            reading=d['reading'],
+            reviews=cls._build_reviews(d['reviews']),
+        )
 
     @classmethod
     def parse(cls, filename):
@@ -51,9 +54,6 @@ class Vocabulary:
     @staticmethod
     def _build_reviews(reviews):
         return sorted((Review.from_dict(r) for r in reviews), key=lambda x: x.timestamp)
-
-    def __repr__(self):
-        return f"Vocabulary({self.vid}, '{self.spelling}', '{self.reading}', {self.reviews})"
 
 
 def main():

@@ -1,12 +1,12 @@
 ## Issues
 
-* Allow customize note type
 * Deal with importing history for J=>E and E=>J separately
-* Import custom metadata set on JPDB cards:
+* Import custom metadata set on JPDB cards (probably not possible without API)
 --> custom sentence
 --> custom definition
 --> enabled definitions on reverse side
 * Manual for how to add audio, sentences, rich media
+* Filter import by what is in a specific JPDB deck, e.g. only N3, etc.
 
 
 ## Creating Rich Cards
