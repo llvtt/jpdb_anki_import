@@ -2,5 +2,7 @@
   "noteType": "Basic",
   "deckName": "Default",
   "expressionField": "Front",
-  "readingField": "Back"
+  "readingField": "Back",
+  "englishToJapaneseCardName": "ENtoJP",
+  "japaneseToEnglishCardName": "JPtoEN"
 }
