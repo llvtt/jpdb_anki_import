@@ -1,5 +1,4 @@
 import dataclasses
-import datetime
 import json
 
 
@@ -18,50 +17,40 @@ class Vocabulary:
     vid: int
     spelling: str
     reading: str
-    reviews: list[Review]
+    en_jp_reviews: list[Review] = dataclasses.field(default_factory=list)
+    jp_en_reviews: list[Review] = dataclasses.field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, d):
-        return cls(
-            vid=d['vid'],
-            spelling=d['spelling'],
-            reading=d['reading'],
-            reviews=cls._build_reviews(d['reviews']),
-        )
-
-    @classmethod
-    def parse(cls, filename):
+    def parse(cls, filename) -> list:
         with open(filename, 'rb') as review_file:
             reviews = json.load(review_file)
 
-        en_reviews = [cls.from_dict(v) for v in reviews['cards_vocabulary_en_jp']]
-        jp_reviews = [cls.from_dict(v) for v in reviews['cards_vocabulary_jp_en']]
+        by_vid = {}
+        for vocab in reviews.get('cards_vocabulary_en_jp', []):
+            vid = vocab['vid']
+            by_vid[vid] = cls(
+                vid=vid,
+                spelling=vocab['spelling'],
+                reading=vocab['reading'],
+                en_jp_reviews=cls._build_reviews(vocab['reviews'])
+            )
 
-        # merge together but keep reviews only from jp => en
-        by_vid = {v.vid: v for v in jp_reviews}
-        for v in en_reviews:
-            if v.vid not in by_vid:
-                # Add a new vocab word with blank reviews.
-                by_vid[v.vid] = cls(
-                    vid=int(v.vid),
-                    spelling=v.spelling,
-                    reading=v.reading,
-                    reviews=[]
+        for vocab in reviews.get('cards_vocabulary_jp_en', []):
+            vid = vocab['vid']
+            reviews = cls._build_reviews(vocab['reviews'])
+
+            if vid in by_vid:
+                by_vid[vid].jp_en_reviews = reviews
+            else:
+                by_vid[vid] = cls(
+                    vid=vid,
+                    spelling=vocab['spelling'],
+                    reading=vocab['reading'],
+                    jp_en_reviews=reviews
                 )
 
         return list(by_vid.values())
 
     @staticmethod
-    def _build_reviews(reviews):
+    def _build_reviews(reviews) -> list[Review]:
         return sorted((Review.from_dict(r) for r in reviews), key=lambda x: x.timestamp)
-
-
-def main():
-    vocab = Vocabulary.parse('../vocabulary-reviews.json')
-    vocab.sort(key=lambda x: x.spelling)
-    for v in vocab:
-        print(v)
-
-
-if __name__ == '__main__':
-    main()

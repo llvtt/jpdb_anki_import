@@ -1,15 +1,9 @@
-# import the main window object (mw) from aqt
+import aqt.qt
 from aqt import mw
-# import all of the Qt GUI library
 from aqt.qt import *
-# import the "show info" tool from utils.py
 from aqt.utils import showInfo
 
-from . import jpdb, importer
-
-REVIEW_FILE = '/Users/luke/code/jpdb_anki_import/vocabulary-reviews.json'
-# We're going to add a menu item below. First we want to create a function to
-# be called when the menu item is activated.
+from . import jpdb, importer, config
 
 
 def check_initial_state() -> bool:
@@ -25,15 +19,20 @@ def import_jpdb() -> None:
     if not check_initial_state():
         return
 
-    vocab = jpdb.Vocabulary.parse(REVIEW_FILE)
-    imp = importer.JPDBImporter(mw.addonManager.getConfig(__name__))
-    notes_created = imp.create_notes(vocab)
-    showInfo(f'parsed {len(vocab)} vocabulary words from JPDB, created {notes_created} notes')
+    option_dialog = config.ConfigGUI(mw)
+    if option_dialog.exec() == aqt.qt.QDialog.DialogCode.Accepted:
+        c = option_dialog.config
+    else:
+        return
+
+    try:
+        imp = importer.JPDBImporter(c)
+        stats = imp.run()
+        showInfo(f'parsed {stats["parsed"]} vocabulary words from JPDB, created {stats["notes_created"]} notes')
+    except Exception:
+        raise Exception(f'could not parse {c.review_file}')
 
 
-# create a new menu item, "test"
 action = QAction('Import from JPDB', mw)
-# set it to call testFunction when it's clicked
 qconnect(action.triggered, import_jpdb)
-# and add it to the tools menu
 mw.form.menuTools.addAction(action)

@@ -1,33 +1,40 @@
-## Issues
+# jpdb_anki_import
 
-* Deal with importing history for J=>E and E=>J separately
-* Import custom metadata set on JPDB cards (probably not possible without API)
---> custom sentence
---> custom definition
---> enabled definitions on reverse side
-* Manual for how to add audio, sentences, rich media
-* Filter import by what is in a specific JPDB deck, e.g. only N3, etc.
+## Overview
 
+An Anki plugin that imports review history for words studied in [JPDB](https://jpdb.io).
 
-## Creating Rich Cards
+This plugin imports the following information:
+* Japanese spelling (e.g. 言葉)
+* Japanese reading (e.g. ことば)
+* Review history, accomplished by simulating the same button answer responses in Anki.
 
-1. Install this plugin and import your JPDB review history using the "Basic" note type.
-   These notes only have two fields, `Front` and `Back`. Leave that for now.
+This plugin *does not* import:
+* English definitions
+* Custom sentences
+* Audio
+* Pitch accent
 
-2. Install [Japanese Example Sentences](https://ankiweb.net/shared/info/2413435972) plugin.
-   Go to the plugin configuration, and change these settings:
+These data are not included in the JPDB review history export, so they are not included.
+If/when JPDB has a public API, I will look into adding support, but for now this plugin 
+is meant to create a good starting point in Anki for studying words previously added to JPDB,
+so that other richer media (e.g. pictures, video, etc) can be added later.
+See the "Recommended Additional Plugins" section below for links to some other Anki add-ons that can help
+make the resulting cards richer with little effort.
 
-       * `srcFields`: set this to "Front" and "Back"
-       * `noteTypes`: set this to "Basic"
-       * `combinedDstField`: set this to "examples"
-       * `lookupOnAdd`: set this to `false` (optional, I just want to
-         seed some examples to start, then take over adding examples
-         manually from there)
+## Usage
 
-3. Add a `examples` field to the `Basic` note type, which will hold example sentences.
+1. Download your JPDB review history by going to the [settings page](https://jpdb.io/settings) and clicking
+   "Export vocabulary reviews (.json)" near the bottom of the page.
+2. Create a new Anki deck where you want to import your JPDB cards.
+3. After installing this add-on, in Anki, go to "Tools" => "Import from JPDB"
+4. Follow the instructions in the setup window.
 
-4. Restart Anki. Select all cards in the browser and and "Bulk-add Examples"
+## Recommended Additional Plugins
 
-5. Install and use AwesomeTTS
+The following other Anki plugins can help flesh out cards created after the import to add translation and more detail:
 
-6. Install and use pitch diagram builder
+* [Automatic Japanese Dictionary Lookup](https://ankiweb.net/shared/info/1015321168) adds English definitions for Japanese words
+* [Japanese Example Sentences](https://ankiweb.net/shared/info/2413435972) adds example Japanese sentences.
+* [AwesomeTTS](https://ankiweb.net/shared/info/1436550454) adds Japanese audio for words.
+* [Japanese Pitch Accent](https://ankiweb.net/shared/info/148002038) adds pitch accent diagrams.
