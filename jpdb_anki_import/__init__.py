@@ -7,9 +7,9 @@ from aqt.utils import showInfo
 
 from . import jpdb, importer
 
+
+# TODO: allow choosing by file select window
 REVIEW_FILE = '/Users/luke/code/jpdb_anki_import/vocabulary-reviews.json'
-# We're going to add a menu item below. First we want to create a function to
-# be called when the menu item is activated.
 
 
 def check_initial_state() -> bool:
@@ -25,15 +25,20 @@ def import_jpdb() -> None:
     if not check_initial_state():
         return
 
-    vocab = jpdb.Vocabulary.parse(REVIEW_FILE)
-    imp = importer.JPDBImporter(mw.addonManager.getConfig(__name__))
-    notes_created = imp.create_notes(vocab)
-    showInfo(f'parsed {len(vocab)} vocabulary words from JPDB, created {notes_created} notes')
+    review_file, _ = QFileDialog.getOpenFileName(
+        caption='Select JPDB Review Export JSON file',
+        initialFilter='JSON files (*.json)',
+    )
+
+    try:
+        vocab = jpdb.Vocabulary.parse(review_file)
+        imp = importer.JPDBImporter(mw.addonManager.getConfig(__name__))
+        notes_created = imp.create_notes(vocab)
+        showInfo(f'parsed {len(vocab)} vocabulary words from JPDB, created {notes_created} notes')
+    except Exception:
+        raise Exception(f'could not parse {review_file}')
 
 
-# create a new menu item, "test"
 action = QAction('Import from JPDB', mw)
-# set it to call testFunction when it's clicked
 qconnect(action.triggered, import_jpdb)
-# and add it to the tools menu
 mw.form.menuTools.addAction(action)

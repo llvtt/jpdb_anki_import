@@ -83,6 +83,7 @@ class JPDBImporter:
                 new_state=new_state,
                 rating=rating,
                 answered_at_millis=review.timestamp * 1000,
+                # Arbitrary
                 milliseconds_taken=1000,
             )
             mw.col.sched.answer_card(card_answer)
@@ -104,6 +105,7 @@ class JPDBImporter:
         if jp_en_card:
             self.backfill_reviews(jp_en_card, vocab.jp_en_reviews)
         else:
+            # Fall back to assuming the first card for the note is the JP->EN card.
             self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews)
 
     # def find_card_templates(self, note):
