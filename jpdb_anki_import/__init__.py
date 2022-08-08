@@ -1,15 +1,9 @@
-# import the main window object (mw) from aqt
+import aqt.qt
 from aqt import mw
-# import all of the Qt GUI library
 from aqt.qt import *
-# import the "show info" tool from utils.py
 from aqt.utils import showInfo
 
-from . import jpdb, importer
-
-
-# TODO: allow choosing by file select window
-REVIEW_FILE = '/Users/luke/code/jpdb_anki_import/vocabulary-reviews.json'
+from . import jpdb, importer, config
 
 
 def check_initial_state() -> bool:
@@ -25,18 +19,18 @@ def import_jpdb() -> None:
     if not check_initial_state():
         return
 
-    review_file, _ = QFileDialog.getOpenFileName(
-        caption='Select JPDB Review Export JSON file',
-        initialFilter='JSON files (*.json)',
-    )
+    option_dialog = config.ConfigGUI(mw)
+    if option_dialog.exec() == aqt.qt.QDialog.DialogCode.Accepted:
+        c = option_dialog.config
+    else:
+        return
 
     try:
-        vocab = jpdb.Vocabulary.parse(review_file)
-        imp = importer.JPDBImporter(mw.addonManager.getConfig(__name__))
-        notes_created = imp.create_notes(vocab)
-        showInfo(f'parsed {len(vocab)} vocabulary words from JPDB, created {notes_created} notes')
+        imp = importer.JPDBImporter(c)
+        stats = imp.run()
+        showInfo(f'parsed {stats["parsed"]} vocabulary words from JPDB, created {stats["notes_created"]} notes')
     except Exception:
-        raise Exception(f'could not parse {review_file}')
+        raise Exception(f'could not parse {c.review_file}')
 
 
 action = QAction('Import from JPDB', mw)

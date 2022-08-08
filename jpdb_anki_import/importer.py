@@ -1,11 +1,14 @@
 """
 Create Notes and Cards in Anki for JPDB vocabulary cards.
 """
+import dataclasses
+
 from anki.cards import Card
+from anki.decks import DeckId
 from anki.notes import Note
 from anki.scheduler.v3 import CardAnswer
 from aqt import mw
-from . import jpdb
+from . import jpdb, config
 
 
 JPDB_TO_CARD_ANSWER = {
@@ -21,37 +24,24 @@ JPDB_TO_CARD_ANSWER = {
 
 
 class JPDBImporter:
-    def __init__(self, config):
+    def __init__(self, conf: config.Config):
         # TODO: validate config, e.g. cannot have same card type for EN/JP
-        self.note_type = config['noteType']
-        self.deck_name = config['deckName']
-        self.expression_field = config['expressionField']
-        self.reading_field = config['readingField']
-        self.jp_en_card_name = config['japaneseToEnglishCardName']
-        self.en_jp_card_name = config['englishToJapaneseCardName']
-
-        # Used to track index of card template for JP=>EN and EN=>JP cards, respectively.
-        self.jp_en_ord = None
-        self.en_jp_ord = None
+        self.config = conf
 
     def create_note(self, vocab: jpdb.Vocabulary):
-        # TODO: something odd seems to be going on here when we add new notes
-        # across _different_ decks.
-        # TODO: I think this may have to do with the fact that the first field in a note is used internally by Anki as the ID.
-        note_model = mw.col.models.by_name(self.note_type) or mw.col.models.current()
+        note_model = mw.col.models.get(self.config.note_type_id) or mw.col.models.current()
         note = mw.col.new_note(note_model)
 
-        if self.expression_field in note:
-            note[self.expression_field] = vocab.spelling
+        if self.config.expression_field in note:
+            note[self.config.expression_field] = vocab.spelling
         else:
             note.fields[0] = vocab.spelling
 
-        if self.reading_field in note:
-            note[self.reading_field] = vocab.reading
+        if self.config.reading_field in note:
+            note[self.config.reading_field] = vocab.reading
         else:
             note.fields[1] = vocab.reading
-
-        mw.col.add_note(note, mw.col.decks.id_for_name(self.deck_name))
+        mw.col.add_note(note, DeckId(self.config.deck_id))
 
         return note
 
@@ -93,9 +83,9 @@ class JPDBImporter:
         en_jp_card = None
         for card in note.cards():
             template_name = card.template()['name']
-            if template_name == self.jp_en_card_name:
+            if template_name == self.config.jp2en_card_name:
                 jp_en_card = card
-            elif template_name == self.en_jp_card_name:
+            elif template_name == self.config.en2jp_card_name:
                 en_jp_card = card
 
         if en_jp_card:
@@ -108,22 +98,7 @@ class JPDBImporter:
             # Fall back to assuming the first card for the note is the JP->EN card.
             self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews)
 
-    # def find_card_templates(self, note):
-    #     if self.en_jp_ord is not None or self.jp_en_ord is not None:
-    #         return
-    #
-    #     note_templates = note.note_type().get('tmpls', [])
-    #     for tmpl in note_templates:
-    #         try:
-    #             template_name = tmpl['name']
-    #             if template_name == self.en_jp_card_name:
-    #                 self.en_jp_ord = tmpl['ord']
-    #             elif template_name == self.jp_en_card_name:
-    #                 self.jp_en_ord = tmpl['ord']
-    #         except (TypeError, KeyError):
-    #             pass
-
-    def create_notes(self, vocabulary: list[jpdb.Vocabulary]):
+    def create_notes(self, vocabulary):
         notes_created = 0
         for vocab in vocabulary:
             note = self.create_note(vocab)
@@ -133,3 +108,10 @@ class JPDBImporter:
                 self.backfill(note, vocab)
 
         return notes_created
+
+    def run(self) -> dict:
+        vocabulary = jpdb.Vocabulary.parse(self.config.review_file)
+        return {
+            'parsed': len(vocabulary),
+            'notes_created': self.create_notes(vocabulary),
+        }
