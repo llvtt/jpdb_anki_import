@@ -1,15 +1,14 @@
 """
 Create Notes and Cards in Anki for JPDB vocabulary cards.
 """
-import dataclasses
 
 from anki.cards import Card
 from anki.decks import DeckId
 from anki.notes import Note
 from anki.scheduler.v3 import CardAnswer
 from aqt import mw
-from . import jpdb, config
 
+from . import jpdb, config
 
 JPDB_TO_CARD_ANSWER = {
     'okay': CardAnswer.GOOD,
