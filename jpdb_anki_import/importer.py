@@ -1,7 +1,7 @@
 """
 Create Notes and Cards in Anki for JPDB vocabulary cards.
 """
-
+import aqt.qt
 from anki.cards import Card
 from anki.decks import DeckId
 from anki.notes import Note
@@ -98,18 +98,33 @@ class JPDBImporter:
             self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews)
 
     def create_notes(self, vocabulary):
+        progress = aqt.qt.QProgressDialog('Importing from JPDB', 'Cancel', 0, len(vocabulary), mw)
+        bar = aqt.qt.QProgressBar(progress)
+        bar.setFormat('%v/%m')
+        bar.setMaximum(len(vocabulary))
+        progress.setBar(bar)
+        progress.setMinimumDuration(1000)
+        progress.setModal(True)
+
         notes_created = 0
-        for vocab in vocabulary:
+        for i, vocab in enumerate(vocabulary):
+            progress.setValue(i)
+            if progress.wasCanceled():
+                break
+
             note = self.create_note(vocab)
 
             if note:
                 notes_created += 1
                 self.backfill(note, vocab)
 
+        progress.setValue(len(vocabulary))
+
         return notes_created
 
     def run(self) -> dict:
         vocabulary = jpdb.Vocabulary.parse(self.config.review_file)
+
         return {
             'parsed': len(vocabulary),
             'notes_created': self.create_notes(vocabulary),
