@@ -26,7 +26,7 @@ def import_jpdb() -> None:
         return
 
     try:
-        imp = importer.JPDBImporter(c)
+        imp = importer.JPDBImporter(c, mw)
         stats = imp.run()
         showInfo(f'parsed {stats["parsed"]} vocabulary words from JPDB, created {stats["notes_created"]} notes')
     except Exception:

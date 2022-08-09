@@ -6,7 +6,6 @@ from anki.cards import Card
 from anki.decks import DeckId
 from anki.notes import Note
 from anki.scheduler.v3 import CardAnswer
-from aqt import mw
 
 from . import jpdb, config
 
@@ -23,13 +22,13 @@ JPDB_TO_CARD_ANSWER = {
 
 
 class JPDBImporter:
-    def __init__(self, conf: config.Config):
-        # TODO: validate config, e.g. cannot have same card type for EN/JP
+    def __init__(self, conf: config.Config, anki: aqt.AnkiQt):
         self.config = conf
+        self.anki = anki
 
-    def create_note(self, vocab: jpdb.Vocabulary):
-        note_model = mw.col.models.get(self.config.note_type_id) or mw.col.models.current()
-        note = mw.col.new_note(note_model)
+    def create_note(self, vocab: jpdb.Vocabulary) -> Note:
+        note_model = self.anki.col.models.get(self.config.note_type_id) or self.anki.col.models.current()
+        note = self.anki.col.new_note(note_model)
 
         if self.config.expression_field in note:
             note[self.config.expression_field] = vocab.spelling
@@ -40,15 +39,13 @@ class JPDBImporter:
             note[self.config.reading_field] = vocab.reading
         else:
             note.fields[1] = vocab.reading
-        mw.col.add_note(note, DeckId(self.config.deck_id))
+        self.anki.col.add_note(note, DeckId(self.config.deck_id))
 
         return note
 
-    @staticmethod
-    def card_state_current_next(card: Card, rating: str):
+    def card_state_current_next(self, card: Card, rating: str) -> (CardAnswer, CardAnswer):
         # The following code is taken directly from the Anki v3 scheduler
-        # TODO: is there a safer way to do this?
-        states = mw.col._backend.get_next_card_states(card.id)
+        states = self.anki.col._backend.get_next_card_states(card.id)
         if rating == CardAnswer.AGAIN:
             new_state = states.again
         elif rating == CardAnswer.HARD:
@@ -62,7 +59,7 @@ class JPDBImporter:
 
         return states.current, new_state
 
-    def backfill_reviews(self, card: Card, reviews: list[jpdb.Review]):
+    def backfill_reviews(self, card: Card, reviews: list[jpdb.Review]) -> None:
         for review in reviews:
             rating = JPDB_TO_CARD_ANSWER[review.grade]
             current_state, new_state = self.card_state_current_next(card, rating)
@@ -75,9 +72,9 @@ class JPDBImporter:
                 # Arbitrary
                 milliseconds_taken=1000,
             )
-            mw.col.sched.answer_card(card_answer)
+            self.anki.col.sched.answer_card(card_answer)
 
-    def backfill(self, note: Note, vocab: jpdb.Vocabulary):
+    def backfill(self, note: Note, vocab: jpdb.Vocabulary) -> None:
         jp_en_card = None
         en_jp_card = None
         for card in note.cards():
@@ -97,8 +94,8 @@ class JPDBImporter:
             # Fall back to assuming the first card for the note is the JP->EN card.
             self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews)
 
-    def create_notes(self, vocabulary):
-        progress = aqt.qt.QProgressDialog('Importing from JPDB', 'Cancel', 0, len(vocabulary), mw)
+    def create_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
+        progress = aqt.qt.QProgressDialog('Importing from JPDB', 'Cancel', 0, len(vocabulary), self.anki)
         bar = aqt.qt.QProgressBar(progress)
         bar.setFormat('%v/%m')
         bar.setMaximum(len(vocabulary))
@@ -124,8 +121,9 @@ class JPDBImporter:
 
     def run(self) -> dict:
         vocabulary = jpdb.Vocabulary.parse(self.config.review_file)
-
-        return {
+        stats = {
             'parsed': len(vocabulary),
             'notes_created': self.create_notes(vocabulary),
         }
+        self.anki.overview.refresh()
+        return stats
