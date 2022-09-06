@@ -1,6 +1,9 @@
 """
 Create Notes and Cards in Anki for JPDB vocabulary cards.
 """
+from typing import Optional
+
+import aqt
 import aqt.qt
 from anki.cards import Card
 from anki.decks import DeckId
@@ -27,8 +30,7 @@ class JPDBImporter:
         self.anki = anki
 
     def create_note(self, vocab: jpdb.Vocabulary) -> Note:
-        note_model = self.anki.col.models.get(self.config.note_type_id) or self.anki.col.models.current()
-        note = self.anki.col.new_note(note_model)
+        note = self.anki.col.new_note(self._note_model)
 
         if self.config.expression_field in note:
             note[self.config.expression_field] = vocab.spelling
@@ -59,8 +61,20 @@ class JPDBImporter:
 
         return states.current, new_state
 
-    def backfill_reviews(self, card: Card, reviews: list[jpdb.Review]) -> None:
-        for review in reviews:
+    @staticmethod
+    def _slice_reviews(reviews: list[jpdb.Review], since: Optional[int] = None) -> list[jpdb.Review]:
+        if since is None:
+            return reviews
+
+        for i, review in enumerate(reviews):
+            # `since` is in milliseconds
+            if review.timestamp * 1000 > since:
+                return reviews[i:]
+
+        return []
+
+    def backfill_reviews(self, card: Card, reviews: list[jpdb.Review], since: Optional[int] = None) -> None:
+        for review in self._slice_reviews(reviews, since):
             rating = JPDB_TO_CARD_ANSWER[review.grade]
             current_state, new_state = self.card_state_current_next(card, rating)
             card_answer = CardAnswer(
@@ -74,7 +88,7 @@ class JPDBImporter:
             )
             self.anki.col.sched.answer_card(card_answer)
 
-    def backfill(self, note: Note, vocab: jpdb.Vocabulary) -> None:
+    def backfill(self, note: Note, vocab: jpdb.Vocabulary, since: Optional[int] = None) -> None:
         jp_en_card = None
         en_jp_card = None
         for card in note.cards():
@@ -85,14 +99,58 @@ class JPDBImporter:
                 en_jp_card = card
 
         if en_jp_card:
-            self.backfill_reviews(en_jp_card, vocab.en_jp_reviews)
+            self.backfill_reviews(en_jp_card, vocab.en_jp_reviews, since)
 
         # Always fill in JP->EN cards, otherwise what's the point.
         if jp_en_card:
-            self.backfill_reviews(jp_en_card, vocab.jp_en_reviews)
+            self.backfill_reviews(jp_en_card, vocab.jp_en_reviews, since)
         else:
             # Fall back to assuming the first card for the note is the JP->EN card.
-            self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews)
+            self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews, since)
+
+    def update_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
+        # TODO: use progress bar here as context manager? use number of notes as number of progress steps
+        vocabulary_by_spelling = {v.spelling: v for v in vocabulary}
+
+        notes_updated = 0
+
+        for note_id in self.anki.col.find_notes(f'did:{self.config.deck_id}'):
+            note = Note(self.anki.col, id=note_id)
+            note_expression = note[self.config.expression_field]
+            # Is there a JPDB review for this note?
+            vocab = vocabulary_by_spelling.get(note_expression)
+            if not vocab:
+                continue
+
+            for card in note.cards():
+                # Figure out if we're doing JP => EN or EN => JP.
+                try:
+                    card_name = self._note_model["tmpls"][card.ord]
+                except IndexError:
+                    continue
+                else:
+                    reviews_for_card = vocab.jp_en_reviews
+                    if card_name == self.config.en2jp_card_name:
+                        reviews_for_card = vocab.en_jp_reviews
+
+                # Find the latest review for the card.
+                latest_review = self.anki.col.db.scalar(
+                    'select id from revlog '
+                    'inner join cards on revlog.cid = cards.id '
+                    'where cards.id = ? '
+                    'order by id desc '
+                    'limit 1',
+                    card.id)
+
+                self.backfill_reviews(card, reviews_for_card, latest_review)
+
+                notes_updated += 1
+
+        return notes_updated
+
+    @property
+    def _note_model(self):
+        return self.anki.col.models.get(self.config.note_type_id) or self.anki.col.models.current()
 
     def create_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
         progress = aqt.qt.QProgressDialog('Importing from JPDB', 'Cancel', 0, len(vocabulary), self.anki)
@@ -123,6 +181,7 @@ class JPDBImporter:
         vocabulary = jpdb.Vocabulary.parse(self.config.review_file)
         stats = {
             'parsed': len(vocabulary),
+            'notes_updated': self.update_notes(vocabulary),
             'notes_created': self.create_notes(vocabulary),
         }
         self.anki.overview.refresh()
