@@ -77,6 +77,8 @@ class AnkiRunner:
 
 
 class E2ETest(unittest.TestCase):
+    anki_runner: AnkiRunner
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.anki_runner = AnkiRunner()
@@ -84,6 +86,7 @@ class E2ETest(unittest.TestCase):
 
         from aqt import mw
         mw.setupProfile()
+        mw.col.set_v3_scheduler(True)
         cls.mw = mw
 
     @classmethod
@@ -104,7 +107,6 @@ class E2ETest(unittest.TestCase):
 
     def test_import(self):
         """Test importing into a deck without notes."""
-        # [importer:117] AttributeError: 'NoneType' object has no attribute 'find_notes'
         self.importer.run()
 
     def test_import_with_existing_notes(self):
