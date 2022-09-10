@@ -28,6 +28,7 @@ class JPDBImporter:
     def __init__(self, conf: config.Config, anki: aqt.AnkiQt):
         self.config = conf
         self.anki = anki
+        self._updated_vocabulary = set()
 
     def create_note(self, vocab: jpdb.Vocabulary) -> Note:
         note = self.anki.col.new_note(self._note_model)
@@ -112,8 +113,6 @@ class JPDBImporter:
         # TODO: use progress bar here as context manager? use number of notes as number of progress steps
         vocabulary_by_spelling = {v.spelling: v for v in vocabulary}
 
-        notes_updated = 0
-
         for note_id in self.anki.col.find_notes(f'did:{self.config.deck_id}'):
             note = Note(self.anki.col, id=note_id)
             note_expression = note[self.config.expression_field]
@@ -143,10 +142,9 @@ class JPDBImporter:
                     card.id)
 
                 self.backfill_reviews(card, reviews_for_card, latest_review)
+                self._updated_vocabulary.add(note_expression)
 
-                notes_updated += 1
-
-        return notes_updated
+        return len(self._updated_vocabulary)
 
     @property
     def _note_model(self):
@@ -166,6 +164,8 @@ class JPDBImporter:
             progress.setValue(i)
             if progress.wasCanceled():
                 break
+            if vocab.spelling in self._updated_vocabulary:
+                continue
 
             note = self.create_note(vocab)
 

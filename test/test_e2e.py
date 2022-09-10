@@ -1,3 +1,4 @@
+import csv
 import os
 import os.path
 import tempfile
@@ -93,22 +94,37 @@ class E2ETest(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls.anki_runner.stop_anki()
 
+    @staticmethod
+    def fixture_path(filename):
+        return os.path.join(os.path.dirname(__file__), 'fixtures', filename)
+
+    def revlog_records(self):
+        return sorted(
+            # match expected types from self.review_history
+            (sfld, str(rid))
+            for sfld, rid in self.mw.col.db.execute(
+                'select notes.sfld, revlog.id from notes '
+                'inner join cards on cards.nid = notes.id '
+                'inner join revlog on revlog.cid = cards.id'
+            ))
+
     def setUp(self) -> None:
         # Plugin can only be imported after Anki is running.
         import jpdb_anki_import
 
-        self.config = jpdb_anki_import.config.Config(
-            review_file=os.path.join(
-                os.path.dirname(__file__),
-                'fixtures',
-                'vocabulary-reviews.json')
-        )
+        self.config = jpdb_anki_import.config.Config(review_file=self.fixture_path('vocabulary-reviews.json'))
         self.importer = jpdb_anki_import.importer.JPDBImporter(self.config, self.mw)
+
+        with open(self.fixture_path('review-history.csv'), 'r') as csvfile:
+            self.review_history = sorted(tuple(review) for review in csv.reader(csvfile))
 
     def test_import(self):
         """Test importing into a deck without notes."""
         self.importer.run()
+        self.assertEqual(self.review_history, self.revlog_records())
 
     def test_import_with_existing_notes(self):
         """Test importing into a deck where there are already notes."""
-        pass
+        self.importer.run()
+        self.importer.run()
+        self.assertEqual(self.review_history, self.revlog_records())
