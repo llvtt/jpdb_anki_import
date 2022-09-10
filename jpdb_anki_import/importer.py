@@ -113,36 +113,37 @@ class JPDBImporter:
         # TODO: use progress bar here as context manager? use number of notes as number of progress steps
         vocabulary_by_spelling = {v.spelling: v for v in vocabulary}
 
-        for note_id in self.anki.col.find_notes(f'did:{self.config.deck_id}'):
-            note = Note(self.anki.col, id=note_id)
+        for card_id in self.anki.col.find_cards(f'did:{self.config.deck_id}'):
+            card = Card(self.anki.col, card_id)
+            note = card.note()
             note_expression = note[self.config.expression_field]
+
             # Is there a JPDB review for this note?
             vocab = vocabulary_by_spelling.get(note_expression)
             if not vocab:
                 continue
 
-            for card in note.cards():
-                # Figure out if we're doing JP => EN or EN => JP.
-                try:
-                    card_name = self._note_model["tmpls"][card.ord]
-                except IndexError:
-                    continue
-                else:
-                    reviews_for_card = vocab.jp_en_reviews
-                    if card_name == self.config.en2jp_card_name:
-                        reviews_for_card = vocab.en_jp_reviews
+            # Figure out if we're doing JP => EN or EN => JP.
+            try:
+                card_name = self._note_model["tmpls"][card.ord]
+            except IndexError:
+                continue
+            else:
+                reviews_for_card = vocab.jp_en_reviews
+                if card_name == self.config.en2jp_card_name:
+                    reviews_for_card = vocab.en_jp_reviews
 
-                # Find the latest review for the card.
-                latest_review = self.anki.col.db.scalar(
-                    'select id from revlog '
-                    'inner join cards on revlog.cid = cards.id '
-                    'where cards.id = ? '
-                    'order by id desc '
-                    'limit 1',
-                    card.id)
+            # Find the latest review for the card.
+            latest_review = self.anki.col.db.scalar(
+                'select revlog.id from revlog '
+                'inner join cards on revlog.cid = cards.id '
+                'where cards.id = ? '
+                'order by revlog.id desc '
+                'limit 1',
+                card.id)
 
-                self.backfill_reviews(card, reviews_for_card, latest_review)
-                self._updated_vocabulary.add(note_expression)
+            self.backfill_reviews(card, reviews_for_card, latest_review)
+            self._updated_vocabulary.add(note_expression)
 
         return len(self._updated_vocabulary)
 

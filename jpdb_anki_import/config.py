@@ -7,8 +7,8 @@ import aqt
 @dataclasses.dataclass
 class Config:
     review_file: str = ''
-    deck_id: int = 0
-    note_type_id: int = 0
+    deck_id: int = 1
+    note_type_id: int = 1
     reading_field: str = 'Back'
     expression_field: str = 'Front'
     jp2en_card_name: str = 'JPtoEN'
