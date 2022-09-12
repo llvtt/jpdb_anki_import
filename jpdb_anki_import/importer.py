@@ -123,6 +123,9 @@ class JPDBImporter:
 
     def update_notes(self, vocabulary: list[jpdb.Vocabulary]) -> set[str]:
         deck_cards = list(self.anki.col.find_cards(f'did:{self.config.deck_id}'))
+        if not deck_cards:
+            return set()
+
         progress = self._create_progress_dialog('Updating notes from JPDB history', len(deck_cards))
         vocabulary_by_spelling = {v.spelling: v for v in vocabulary}
         updated_vocabulary = set()
