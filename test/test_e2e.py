@@ -99,15 +99,7 @@ class E2ETest(unittest.TestCase):
         import jpdb_anki_import
         self.module = jpdb_anki_import
 
-        self.config = self.module.config.Config(
-            review_file=self.fixture_path('reviews.json'))
-        self.importer = self.module.importer.JPDBImporter(self.config, aqt.mw)
-
-        with open(self.fixture_path('review-history.csv'), 'r') as csvfile:
-            self.review_history = sorted(tuple(review) for review in csv.reader(csvfile))
-
     def tearDown(self) -> None:
-        # TODO: this may not be sufficient, since these tests also modify Anki's revlog.
         aqt.mw.col.decks.current().clear()
 
     @staticmethod
@@ -125,29 +117,34 @@ class E2ETest(unittest.TestCase):
                 'inner join revlog on revlog.cid = cards.id'
             ))
 
+    def import_file(self, filename):
+        config = self.module.config.Config(review_file=self.fixture_path(filename))
+        importer = self.module.importer.JPDBImporter(config, aqt.mw)
+        importer.run()
+
+    def expected_review_history(self, filename):
+        with open(self.fixture_path(filename), 'r') as csvfile:
+            return sorted(tuple(review) for review in csv.reader(csvfile))
+
     def test_import(self):
         """Test importing into a deck without notes."""
-        self.importer.run()
-        self.assertEqual(self.review_history, self.review_log())
+        self.import_file('reviews.json')
+        self.assertEqual(
+            self.expected_review_history('review-history.csv'),
+            self.review_log())
 
     def test_reimport(self):
         """Test importing the same set of reviews twice."""
-        self.importer.run()
-        self.importer.run()
-        self.assertEqual(self.review_history, self.review_log())
+        self.import_file('reviews.json')
+        self.import_file('reviews.json')
+        self.assertEqual(
+            self.expected_review_history('review-history.csv'),
+            self.review_log())
 
     def test_update_reviews(self):
         """Test import into a deck where there are already notes."""
-        self.importer.run()
-
-        aqt.mw.col.db.commit()
-        importer = self.module.importer.JPDBImporter(
-            self.module.config.Config(review_file=self.fixture_path('updated-reviews.json')),
-            aqt.mw)
-        importer.run()
-
-        with open(self.fixture_path('updated-review-history.csv'), 'r') as csvfile:
-            review_history = sorted(tuple(review) for review in csv.reader(csvfile))
-
-        self.assertEqual(len(review_history), len(self.review_log()))
-        self.assertEqual(review_history, self.review_log())
+        self.import_file('reviews.json')
+        self.import_file('updated-reviews.json')
+        self.assertEqual(
+            self.expected_review_history('updated-review-history.csv'),
+            self.review_log())
