@@ -28,7 +28,6 @@ class JPDBImporter:
     def __init__(self, conf: config.Config, anki: aqt.AnkiQt):
         self.config = conf
         self.anki = anki
-        self._updated_vocabulary = set()
 
     def create_note(self, vocab: jpdb.Vocabulary) -> Note:
         note = self.anki.col.new_note(self._note_model)
@@ -112,11 +111,11 @@ class JPDBImporter:
             # Fall back to assuming the first card for the note is the JP->EN card.
             self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews)
 
-    def update_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
+    def update_notes(self, vocabulary: list[jpdb.Vocabulary]) -> set[str]:
         # TODO: use progress bar here as context manager? use number of notes as number of progress steps
         vocabulary_by_spelling = {v.spelling: v for v in vocabulary}
+        updated_vocabulary = set()
 
-        total_reviews_updated = 0
         for card_id in self.anki.col.find_cards(f'did:{self.config.deck_id}'):
             card = Card(self.anki.col, card_id)
             note = card.note()
@@ -145,16 +144,12 @@ class JPDBImporter:
                 'order by revlog.id desc '
                 'limit 1',
                 card.id)
-            print(f'latest review = {latest_review}; current = {reviews_for_card[-1]}')
 
             reviews = self._slice_reviews(reviews_for_card, latest_review)
-            print(f'reviews: {len(reviews)}')
-            total_reviews_updated += len(reviews)
             self.backfill_reviews(card, reviews)
-            self._updated_vocabulary.add(note_expression)
+            updated_vocabulary.add(note_expression)
 
-        print(f'wanted to update {total_reviews_updated} reviews')
-        return len(self._updated_vocabulary)
+        return updated_vocabulary
 
     @property
     def _note_model(self):
@@ -176,8 +171,6 @@ class JPDBImporter:
             progress.setValue(i)
             if progress.wasCanceled():
                 break
-            if vocab.spelling in self._updated_vocabulary:
-                continue
 
             note = self.create_note(vocab)
 
@@ -191,10 +184,12 @@ class JPDBImporter:
 
     def run(self) -> dict:
         vocabulary = jpdb.Vocabulary.parse(self.config.review_file)
+        updated = self.update_notes(vocabulary)
+        created = self.create_notes([v for v in vocabulary if v.spelling not in updated])
         stats = {
             'parsed': len(vocabulary),
-            'notes_updated': self.update_notes(vocabulary),
-            'notes_created': self.create_notes(vocabulary),
+            'notes_updated': len(updated),
+            'notes_created': created,
         }
         self.anki.overview.refresh()
         return stats
