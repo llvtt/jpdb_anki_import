@@ -1,3 +1,7 @@
+# TODO
+
+* why is the streak number different between Anki & jpdb after importing cards?
+
 # jpdb_anki_import
 
 The most up-to-date information can always be found on the Github page:

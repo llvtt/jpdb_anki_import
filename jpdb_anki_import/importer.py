@@ -29,6 +29,10 @@ class JPDBImporter:
         self.config = conf
         self.anki = anki
 
+    @property
+    def _note_model(self):
+        return self.anki.col.models.get(self.config.note_type_id) or self.anki.col.models.current()
+
     def _create_progress_dialog(self, message, steps):
         dialog = aqt.qt.QProgressDialog(message, 'Cancel', 0, steps, self.anki)
         bar = aqt.qt.QProgressBar(dialog)
@@ -170,10 +174,6 @@ class JPDBImporter:
         progress.setValue(len(deck_cards))
 
         return updated_vocabulary
-
-    @property
-    def _note_model(self):
-        return self.anki.col.models.get(self.config.note_type_id) or self.anki.col.models.current()
 
     def create_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
         progress = self._create_progress_dialog('Importing new notes from JPDB', len(vocabulary))
