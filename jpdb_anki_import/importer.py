@@ -156,8 +156,6 @@ class JPDBImporter:
         return self.anki.col.models.get(self.config.note_type_id) or self.anki.col.models.current()
 
     def create_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
-        # TODO: if we show separate progress bars, we will need to update maximum progress
-        # to account for only non-updated vocabulary.
         progress = aqt.qt.QProgressDialog('Importing from JPDB', 'Cancel', 0, len(vocabulary), self.anki)
         bar = aqt.qt.QProgressBar(progress)
         bar.setFormat('%v/%m')
