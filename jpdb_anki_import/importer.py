@@ -29,6 +29,16 @@ class JPDBImporter:
         self.config = conf
         self.anki = anki
 
+    def _create_progress_dialog(self, message, steps):
+        dialog = aqt.qt.QProgressDialog(message, 'Cancel', 0, steps, self.anki)
+        bar = aqt.qt.QProgressBar(dialog)
+        bar.setFormat('%v/%m')
+        bar.setMaximum(steps)
+        dialog.setBar(bar)
+        dialog.setMinimumDuration(1000)
+        dialog.setModal(True)
+        return dialog
+
     def create_note(self, vocab: jpdb.Vocabulary) -> Note:
         note = self.anki.col.new_note(self._note_model)
 
@@ -112,11 +122,16 @@ class JPDBImporter:
             self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews)
 
     def update_notes(self, vocabulary: list[jpdb.Vocabulary]) -> set[str]:
-        # TODO: use progress bar here as context manager? use number of notes as number of progress steps
+        deck_cards = list(self.anki.col.find_cards(f'did:{self.config.deck_id}'))
+        progress = self._create_progress_dialog('Updating notes from JPDB history', len(deck_cards))
         vocabulary_by_spelling = {v.spelling: v for v in vocabulary}
         updated_vocabulary = set()
 
-        for card_id in self.anki.col.find_cards(f'did:{self.config.deck_id}'):
+        for index, card_id in enumerate(deck_cards):
+            progress.setValue(index)
+            if progress.wasCanceled():
+                break
+
             card = Card(self.anki.col, card_id)
             note = card.note()
             note_expression = note[self.config.expression_field]
@@ -149,6 +164,8 @@ class JPDBImporter:
             self.backfill_reviews(card, reviews)
             updated_vocabulary.add(note_expression)
 
+        progress.setValue(len(deck_cards))
+
         return updated_vocabulary
 
     @property
@@ -156,13 +173,7 @@ class JPDBImporter:
         return self.anki.col.models.get(self.config.note_type_id) or self.anki.col.models.current()
 
     def create_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
-        progress = aqt.qt.QProgressDialog('Importing from JPDB', 'Cancel', 0, len(vocabulary), self.anki)
-        bar = aqt.qt.QProgressBar(progress)
-        bar.setFormat('%v/%m')
-        bar.setMaximum(len(vocabulary))
-        progress.setBar(bar)
-        progress.setMinimumDuration(1000)
-        progress.setModal(True)
+        progress = self._create_progress_dialog('Importing new notes from JPDB', len(vocabulary))
 
         notes_created = 0
         for i, vocab in enumerate(vocabulary):
