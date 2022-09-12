@@ -11,7 +11,7 @@ def with_sorted_reviews(vocab_entry):
     return vocab_entry
 
 
-def create_smaller_review_file(vocab):
+def create_smaller_vocabulary(vocab):
     """Pare down review file to just a few words to limit file size."""
     en_reviews = {v['vid']: with_sorted_reviews(v) for v in vocab['cards_vocabulary_en_jp']}
     jp_reviews = {v['vid']: with_sorted_reviews(v) for v in vocab['cards_vocabulary_jp_en']}
@@ -42,7 +42,7 @@ def create_smaller_review_file(vocab):
     }
 
 
-def create_previous_review_file(vocab):
+def simulate_previously_reviewed_vocabulary(vocab):
     """Create another review file that mocks a set of reviews made at an earlier time."""
 
     def remove_reviews(lang_vocab):
@@ -64,6 +64,7 @@ def create_previous_review_file(vocab):
 def revlog_entries(vocab):
     """Create expected revlog entries for the vocabulary."""
     records = []
+    # The tests are not currently set up to test updating JP => EN cards.
     # records.extend(
     #     (v['spelling'], review['timestamp'] * 1000)
     #     for v in vocab['cards_vocabulary_en_jp']
@@ -85,8 +86,8 @@ def main():
     with open('reviews.json', 'r') as review_file:
         vocabulary = json.load(review_file)
 
-    smaller_vocabulary = create_smaller_review_file(vocabulary)
-    previous_vocabulary = create_previous_review_file(smaller_vocabulary)
+    smaller_vocabulary = create_smaller_vocabulary(vocabulary)
+    previous_vocabulary = simulate_previously_reviewed_vocabulary(smaller_vocabulary)
 
     with open(os.path.join(fixtures_directory, 'updated-reviews.json'), 'w') as review_file:
         json.dump(smaller_vocabulary, review_file)
