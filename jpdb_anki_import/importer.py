@@ -87,9 +87,12 @@ class JPDBImporter:
                 # Arbitrary
                 milliseconds_taken=1000,
             )
-            self.anki.col.sched.answer_card(card_answer)
+            try:
+                self.anki.col.sched.answer_card(card_answer)
+            except Exception as e:
+                print(f'could not rate card {card.id}; state: {current_state}; reason: {e}')
 
-    def backfill(self, note: Note, vocab: jpdb.Vocabulary, since: Optional[int] = None) -> None:
+    def backfill(self, note: Note, vocab: jpdb.Vocabulary) -> None:
         jp_en_card = None
         en_jp_card = None
         for card in note.cards():
@@ -100,19 +103,20 @@ class JPDBImporter:
                 en_jp_card = card
 
         if en_jp_card:
-            self.backfill_reviews(en_jp_card, vocab.en_jp_reviews, since)
+            self.backfill_reviews(en_jp_card, vocab.en_jp_reviews)
 
         # Always fill in JP->EN cards, otherwise what's the point.
         if jp_en_card:
-            self.backfill_reviews(jp_en_card, vocab.jp_en_reviews, since)
+            self.backfill_reviews(jp_en_card, vocab.jp_en_reviews)
         else:
             # Fall back to assuming the first card for the note is the JP->EN card.
-            self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews, since)
+            self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews)
 
     def update_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
         # TODO: use progress bar here as context manager? use number of notes as number of progress steps
         vocabulary_by_spelling = {v.spelling: v for v in vocabulary}
 
+        total_reviews_updated = 0
         for card_id in self.anki.col.find_cards(f'did:{self.config.deck_id}'):
             card = Card(self.anki.col, card_id)
             note = card.note()
@@ -141,10 +145,15 @@ class JPDBImporter:
                 'order by revlog.id desc '
                 'limit 1',
                 card.id)
+            print(f'latest review = {latest_review}; current = {reviews_for_card[-1]}')
 
-            self.backfill_reviews(card, reviews_for_card, latest_review)
+            reviews = self._slice_reviews(reviews_for_card, latest_review)
+            print(f'reviews: {len(reviews)}')
+            total_reviews_updated += len(reviews)
+            self.backfill_reviews(card, reviews)
             self._updated_vocabulary.add(note_expression)
 
+        print(f'wanted to update {total_reviews_updated} reviews')
         return len(self._updated_vocabulary)
 
     @property
@@ -152,6 +161,8 @@ class JPDBImporter:
         return self.anki.col.models.get(self.config.note_type_id) or self.anki.col.models.current()
 
     def create_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
+        # TODO: if we show separate progress bars, we will need to update maximum progress
+        # to account for only non-updated vocabulary.
         progress = aqt.qt.QProgressDialog('Importing from JPDB', 'Cancel', 0, len(vocabulary), self.anki)
         bar = aqt.qt.QProgressBar(progress)
         bar.setFormat('%v/%m')

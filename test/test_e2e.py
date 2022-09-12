@@ -10,6 +10,8 @@ from aqt.main import AnkiQt
 from aqt.profiles import ProfileManager
 
 
+# Much of this is credit to the test setup/teardown in the AwesomeTTS project:
+# https://github.com/AwesomeTTS/awesometts-anki-addon
 class AnkiRunner:
     def __init__(self):
         self.base_directory = tempfile.TemporaryDirectory(suffix='_anki')
@@ -95,15 +97,17 @@ class E2ETest(unittest.TestCase):
     def setUp(self) -> None:
         # Plugin can only be imported after Anki is running.
         import jpdb_anki_import
+        self.module = jpdb_anki_import
 
-        self.config = jpdb_anki_import.config.Config(
-            review_file=self.fixture_path('vocabulary-reviews.json'))
-        self.importer = jpdb_anki_import.importer.JPDBImporter(self.config, aqt.mw)
+        self.config = self.module.config.Config(
+            review_file=self.fixture_path('reviews.json'))
+        self.importer = self.module.importer.JPDBImporter(self.config, aqt.mw)
 
         with open(self.fixture_path('review-history.csv'), 'r') as csvfile:
             self.review_history = sorted(tuple(review) for review in csv.reader(csvfile))
 
     def tearDown(self) -> None:
+        # TODO: this may not be sufficient, since these tests also modify Anki's revlog.
         aqt.mw.col.decks.current().clear()
 
     @staticmethod
@@ -113,7 +117,7 @@ class E2ETest(unittest.TestCase):
     @staticmethod
     def review_log():
         return sorted(
-            # match expected types from self.review_history
+            # Match expected types from self.review_history.
             (sfld, str(rid))
             for sfld, rid in aqt.mw.col.db.execute(
                 'select notes.sfld, revlog.id from notes '
@@ -126,8 +130,24 @@ class E2ETest(unittest.TestCase):
         self.importer.run()
         self.assertEqual(self.review_history, self.review_log())
 
-    def test_import_with_existing_notes(self):
-        """Test importing into a deck where there are already notes."""
+    def test_reimport(self):
+        """Test importing the same set of reviews twice."""
         self.importer.run()
         self.importer.run()
         self.assertEqual(self.review_history, self.review_log())
+
+    def test_update_reviews(self):
+        """Test import into a deck where there are already notes."""
+        self.importer.run()
+
+        aqt.mw.col.db.commit()
+        importer = self.module.importer.JPDBImporter(
+            self.module.config.Config(review_file=self.fixture_path('updated-reviews.json')),
+            aqt.mw)
+        importer.run()
+
+        with open(self.fixture_path('updated-review-history.csv'), 'r') as csvfile:
+            review_history = sorted(tuple(review) for review in csv.reader(csvfile))
+
+        self.assertEqual(len(review_history), len(self.review_log()))
+        self.assertEqual(review_history, self.review_log())
