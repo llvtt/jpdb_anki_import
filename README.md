@@ -2,7 +2,7 @@
 
 ## Overview
 
-An Anki plugin that imports review history for words studied in [JPDB](https://jpdb.io).
+An Anki plugin that imports review history for words studied in [JPDB](https://jpdb.io). Currently working as of Anki 2.60.0.
 
 This plugin imports the following information:
 * Japanese spelling (e.g. 言葉)
