@@ -81,20 +81,20 @@ class ConfigGUI(aqt.qt.QDialog):
 
     def _setup_review_file(self):
         def select_file():
-            path, ok = aqt.qt.QFileDialog.getOpenFileUrl(
+            # we ignore response code because path is None if user cancels
+            path, _ = aqt.qt.QFileDialog.getOpenFileName(
                 self,
                 "JPDB Vocabulary Export",
-                aqt.qt.QUrl(str(pathlib.Path.home())),
+                str(pathlib.Path.home()),
                 "*.json"
             )
-            if not ok:
+
+            if not path:
                 return
 
-            if path.isValid():
-                path = path.path()
-                self._selected_file_label.setText(path)
-                self._config.review_file = path
-                self._set_ok_enabled(True)
+            self._selected_file_label.setText(path)
+            self._config.review_file = path
+            self._set_ok_enabled(True)
 
         button = aqt.qt.QPushButton("Open")
         button.clicked.connect(select_file)
