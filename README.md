@@ -30,6 +30,19 @@ make the resulting cards richer with little effort.
 3. After installing this add-on, in Anki, go to "Tools" => "Import from JPDB"
 4. Follow the instructions in the setup window.
 
+## Building
+To build the package, run `python3 build.py` in the command line which will generate the add-on file `jpdb_anki_import.ankiaddon`.
+
+### Testing
+To test the file in Anki, perform the following steps:
+
+1. Open Anki and click on "Tools" in the top menu bar.
+2. Select "Add-ons" from the dropdown menu.
+3. Click on "Install from file..."
+4. Navigate to the directory where the jpdb_anki_import.ankiaddon file was generated, and select it.
+5. Click "Open" to install the addon.
+6. Restart Anki if prompted to do so.
+
 ## Recommended Additional Plugins
 
 The following other Anki plugins can help flesh out cards created after the import to add translation and more detail:
