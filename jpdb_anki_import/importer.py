@@ -45,7 +45,7 @@ class JPDBImporter:
 
     def card_state_current_next(self, card: Card, rating: str) -> (CardAnswer, CardAnswer):
         # The following code is taken directly from the Anki v3 scheduler
-        states = self.anki.col._backend.get_next_card_states(card.id)
+        states = self.anki.col.backend.get_scheduling_states(card.id)
         if rating == CardAnswer.AGAIN:
             new_state = states.again
         elif rating == CardAnswer.HARD:
