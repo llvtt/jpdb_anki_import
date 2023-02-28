@@ -3,6 +3,6 @@
     "description": "An Anki plugin that imports review history for words studied in JPDB.",
     "package": "jpdb_anki_import",
     "version": "1.0.1",
-    "min_point_version": 60,
+    "min_point_version": 51,
     "license": ""
 }
