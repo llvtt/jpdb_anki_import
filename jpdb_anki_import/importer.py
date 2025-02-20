@@ -18,6 +18,7 @@ JPDB_TO_CARD_ANSWER = {
     'fail': CardAnswer.AGAIN,
     'nothing': CardAnswer.AGAIN,
     'easy': CardAnswer.EASY,
+    'pass': CardAnswer.GOOD,
 }
 
 

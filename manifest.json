@@ -2,7 +2,7 @@
     "name": "JPDB Anki Importer",
     "description": "An Anki plugin that imports review history for words studied in JPDB.",
     "package": "jpdb_anki_import",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "min_point_version": 51,
     "license": ""
 }
