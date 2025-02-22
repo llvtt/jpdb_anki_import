@@ -1,4 +1,5 @@
 import dataclasses
+import itertools
 import pathlib
 
 from typing import Dict, List
@@ -17,21 +18,15 @@ JPDB_CARD_ROLES = [
 
 
 @dataclasses.dataclass
-class ScrapingFieldConfig:
-    input: aqt.qt.QComboBox
-    value: str = ""
-
-
-@dataclasses.dataclass
 class Config:
-    review_file: str = ''
+    review_file: str = ""
     deck_id: int = 0
     note_type_id: int = 0
-    reading_field: str = 'Back'
-    expression_field: str = 'Front'
-    jp2en_card_name: str = 'JPtoEN'
-    en2jp_card_name: str = 'ENtoJP'
-    jpdb_cookie: str = ''
+    reading_field: str = "Back"
+    expression_field: str = "Front"
+    jp2en_card_name: str = "JPtoEN"
+    en2jp_card_name: str = "ENtoJP"
+    jpdb_cookie: str = ""
     # Mapping of JPDB card role (see FieldConfig.role) to Anki card field
     scraped_jpdb_field_mapping: Dict[str, str] = dataclasses.field(default_factory=dict)
 
@@ -40,11 +35,7 @@ class ConfigGUI(aqt.qt.QDialog):
     def __init__(self, window: aqt.AnkiQt, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Initialize field configuration for setting up mapping of JPDB <> Anki fields
-        self._scrape_fields = {
-            role: ScrapingFieldConfig(aqt.qt.QComboBox(), "")
-            for role in JPDB_CARD_ROLES
-        }
+        self._scrape_field_widgets = []
         self._config = Config()
         self._mw = window
         self._create_form()
@@ -75,14 +66,16 @@ class ConfigGUI(aqt.qt.QDialog):
         self._handle_note_type_changed(0)
 
     def _setup_scrape_field(self, jpdb_field_name: str, anki_fields: List[str]):
-        field_config = self._scrape_fields[jpdb_field_name]
-        field_config.input.clear()
-        field_config.input.insertItems(0, anki_fields)
-        def handle_selection(name):
-            field_config.value = name
+        scrape_field = aqt.qt.QComboBox()
+        scrape_field.insertItems(0, anki_fields)
 
-        field_config.input.currentTextChanged.connect(handle_selection)
-        self._layout.addRow(aqt.qt.QLabel(jpdb_field_name.title()), field_config.input)
+        def handle_selection(name):
+            print(f"setting {jpdb_field_name} to map to {name}")
+            self.config.scraped_jpdb_field_mapping[jpdb_field_name] = name
+
+        scrape_field.currentTextChanged.connect(handle_selection)
+        self._layout.addRow(aqt.qt.QLabel(jpdb_field_name.title()), scrape_field)
+        return scrape_field
 
     def _setup_scraping_options(self):
         self._scrape_jpdb = aqt.qt.QCheckBox()
@@ -99,7 +92,9 @@ class ConfigGUI(aqt.qt.QDialog):
         self._jpdb_cookie = aqt.qt.QLineEdit()
         self._jpdb_cookie.textEdited.connect(jpdb_cookie_changed)
         # TODO: create a help file and link to it here
-        jpdb_cookie_label = aqt.qt.QLabel('JPDB Cookie <a href="https://github.com/llvtt/jpdb_anki_import">(?)</a>')
+        jpdb_cookie_label = aqt.qt.QLabel(
+            'JPDB Cookie <a href="https://github.com/llvtt/jpdb_anki_import">(?)</a>'
+        )
         jpdb_cookie_label.setOpenExternalLinks(True)
         self._layout.addRow(
             jpdb_cookie_label,
@@ -108,11 +103,22 @@ class ConfigGUI(aqt.qt.QDialog):
         model = self._mw.col.models.get(self._config.note_type_id)
         anki_field_names = self._mw.col.models.field_names(model)
         for jpdb_field in JPDB_CARD_ROLES:
-            self._setup_scrape_field(jpdb_field, anki_field_names)
-        # TODO: set up other scraping fields
+            self._scrape_field_widgets.append(
+                self._setup_scrape_field(jpdb_field, anki_field_names),
+            )
         scraping_end_row = self._layout.rowCount()
 
         def set_enable_scraping_options(enable_scraping):
+            if enable_scraping and anki_field_names:
+                # Set defaults
+                self.config.scraped_jpdb_field_mapping = {
+                    jpdb_field: anki_field_names[0] for jpdb_field in JPDB_CARD_ROLES
+                }
+            else:
+                # Reset the mapping for scraped fields, so that we can use presence/absence
+                # of JPDB field names to indicate whether we intend to map those fields or not.
+                self.config.scraped_jpdb_field_mapping = {}
+
             for row in range(scraping_start_row, scraping_end_row):
                 self._layout.setRowVisible(row, enable_scraping)
                 input = self._layout.itemAt(row, aqt.qt.QFormLayout.ItemRole.FieldRole)
@@ -143,6 +149,7 @@ class ConfigGUI(aqt.qt.QDialog):
 
         # One row ahead of the checkbox, which hasn't yet been added
         en_card_name_input_row = self._layout.rowCount() + 1
+
         def set_use_en_cards(use_en_cards):
             self._layout.setRowVisible(en_card_name_input_row, use_en_cards)
             self._en_card_name_input.setEditable(use_en_cards)
@@ -165,10 +172,7 @@ class ConfigGUI(aqt.qt.QDialog):
         def select_file():
             # we ignore response code because path is None if user cancels
             path, _ = aqt.qt.QFileDialog.getOpenFileName(
-                self,
-                "JPDB Vocabulary Export",
-                str(pathlib.Path.home()),
-                "*.json"
+                self, "JPDB Vocabulary Export", str(pathlib.Path.home()), "*.json"
             )
 
             if not path:
@@ -190,7 +194,9 @@ class ConfigGUI(aqt.qt.QDialog):
     def _setup_cta_buttons(self):
         self._buttons = aqt.qt.QDialogButtonBox()
         self._buttons.setStandardButtons(
-            aqt.qt.QDialogButtonBox.StandardButton.Ok | aqt.qt.QDialogButtonBox.StandardButton.Cancel)
+            aqt.qt.QDialogButtonBox.StandardButton.Ok
+            | aqt.qt.QDialogButtonBox.StandardButton.Cancel
+        )
         self._set_ok_enabled(False)
         self._buttons.accepted.connect(self.accept)
         self._buttons.rejected.connect(self.reject)
@@ -234,18 +240,20 @@ class ConfigGUI(aqt.qt.QDialog):
         # TODO: refresh field names on all inputs having to do with field names
         #  i.e. also the scraping field configuration
         field_names = self._mw.col.models.field_names(model)
-        self._reading_field_input.clear()
-        self._reading_field_input.addItems(field_names)
-        self._reading_field_input.setEnabled(bool(field_names))
-        self._expression_field_input.clear()
-        self._expression_field_input.addItems(field_names)
-        self._expression_field_input.setEnabled(bool(field_names))
+        for combobox in itertools.chain(
+            [self._reading_field_input, self._expression_field_input],
+            self._scrape_field_widgets,
+        ):
+            combobox.clear()
+            combobox.addItems(field_names)
+            combobox.setEnabled(bool(field_names))
 
-        card_templates = [template['name'] for template in model.get('tmpls', [])]
+        card_templates = [template["name"] for template in model.get("tmpls", [])]
         self._en_card_name_input.clear()
         self._en_card_name_input.addItems(card_templates)
         self._en_card_name_input.setEnabled(
-            bool(card_templates) and self._use_en_cards.isChecked())
+            bool(card_templates) and self._use_en_cards.isChecked()
+        )
         self._jp_card_name_input.clear()
         self._jp_card_name_input.setEnabled(bool(card_templates))
         self._jp_card_name_input.addItems(card_templates)
@@ -255,7 +263,9 @@ class ConfigGUI(aqt.qt.QDialog):
             self._config.reading_field = name
 
         self._reading_field_input = aqt.qt.QComboBox()
-        self._reading_field_input.currentTextChanged.connect(handle_reading_field_selected)
+        self._reading_field_input.currentTextChanged.connect(
+            handle_reading_field_selected
+        )
         self._layout.addRow(
             aqt.qt.QLabel("Reading field"),
             self._reading_field_input,
@@ -266,7 +276,9 @@ class ConfigGUI(aqt.qt.QDialog):
             self._config.expression_field = name
 
         self._expression_field_input = aqt.qt.QComboBox()
-        self._expression_field_input.currentTextChanged.connect(handle_expression_field_changed)
+        self._expression_field_input.currentTextChanged.connect(
+            handle_expression_field_changed
+        )
         self._layout.addRow(
             aqt.qt.QLabel("Expression field"),
             self._expression_field_input,

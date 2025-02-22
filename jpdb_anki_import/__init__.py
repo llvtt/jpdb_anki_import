@@ -25,6 +25,9 @@ def import_jpdb() -> None:
     else:
         return
 
+    print("scraping config", c.scraped_jpdb_field_mapping)
+    return
+
     try:
         imp = importer.JPDBImporter(c, mw)
         stats = imp.run()
