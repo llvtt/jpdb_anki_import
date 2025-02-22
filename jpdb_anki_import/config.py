@@ -245,7 +245,7 @@ class ConfigGUI(aqt.qt.QDialog):
         self._en_card_name_input.clear()
         self._en_card_name_input.addItems(card_templates)
         self._en_card_name_input.setEnabled(
-            bool(card_templates) and self._scrape_jpdb.isChecked())
+            bool(card_templates) and self._use_en_cards.isChecked())
         self._jp_card_name_input.clear()
         self._jp_card_name_input.setEnabled(bool(card_templates))
         self._jp_card_name_input.addItems(card_templates)
