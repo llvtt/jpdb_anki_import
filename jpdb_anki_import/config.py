@@ -1,7 +1,25 @@
 import dataclasses
 import pathlib
 
+from typing import Dict, List
+
 import aqt
+
+
+# TODO: These should match fields coming in from the Scraper
+JPDB_CARD_ROLES = [
+    "spelling",
+    "reading",
+    "glossary",
+    "notes",
+    "sentence",
+]
+
+
+@dataclasses.dataclass
+class ScrapingFieldConfig:
+    input: aqt.qt.QComboBox
+    value: str = ""
 
 
 @dataclasses.dataclass
@@ -13,12 +31,20 @@ class Config:
     expression_field: str = 'Front'
     jp2en_card_name: str = 'JPtoEN'
     en2jp_card_name: str = 'ENtoJP'
+    jpdb_cookie: str = ''
+    # Mapping of JPDB card role (see FieldConfig.role) to Anki card field
+    scraped_jpdb_field_mapping: Dict[str, str] = dataclasses.field(default_factory=dict)
 
 
 class ConfigGUI(aqt.qt.QDialog):
     def __init__(self, window: aqt.AnkiQt, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # Initialize field configuration for setting up mapping of JPDB <> Anki fields
+        self._scrape_fields = {
+            role: ScrapingFieldConfig(aqt.qt.QComboBox(), "")
+            for role in JPDB_CARD_ROLES
+        }
         self._config = Config()
         self._mw = window
         self._create_form()
@@ -42,10 +68,60 @@ class ConfigGUI(aqt.qt.QDialog):
         self._setup_reading_field()
         self._setup_expression_field()
         self._setup_card_names()
+        self._setup_scraping_options()
         self._setup_cta_buttons()
 
         # Trigger default values
         self._handle_note_type_changed(0)
+
+    def _setup_scrape_field(self, jpdb_field_name: str, anki_fields: List[str]):
+        field_config = self._scrape_fields[jpdb_field_name]
+        field_config.input.clear()
+        field_config.input.insertItems(0, anki_fields)
+        def handle_selection(name):
+            field_config.value = name
+
+        field_config.input.currentTextChanged.connect(handle_selection)
+        self._layout.addRow(aqt.qt.QLabel(jpdb_field_name.title()), field_config.input)
+
+    def _setup_scraping_options(self):
+        self._scrape_jpdb = aqt.qt.QCheckBox()
+        self._scrape_jpdb.setChecked(False)
+        self._layout.addRow(
+            aqt.qt.QLabel("Scrape card information from JPDB"),
+            self._scrape_jpdb,
+        )
+
+        def jpdb_cookie_changed(cookie):
+            self.config.jpdb_cookie = cookie
+
+        scraping_start_row = self._layout.rowCount()
+        self._jpdb_cookie = aqt.qt.QLineEdit()
+        self._jpdb_cookie.textEdited.connect(jpdb_cookie_changed)
+        # TODO: create a help file and link to it here
+        jpdb_cookie_label = aqt.qt.QLabel('JPDB Cookie <a href="https://github.com/llvtt/jpdb_anki_import">(?)</a>')
+        jpdb_cookie_label.setOpenExternalLinks(True)
+        self._layout.addRow(
+            jpdb_cookie_label,
+            self._jpdb_cookie,
+        )
+        model = self._mw.col.models.get(self._config.note_type_id)
+        anki_field_names = self._mw.col.models.field_names(model)
+        for jpdb_field in JPDB_CARD_ROLES:
+            self._setup_scrape_field(jpdb_field, anki_field_names)
+        # TODO: set up other scraping fields
+        scraping_end_row = self._layout.rowCount()
+
+        def set_enable_scraping_options(enable_scraping):
+            for row in range(scraping_start_row, scraping_end_row):
+                self._layout.setRowVisible(row, enable_scraping)
+                input = self._layout.itemAt(row, aqt.qt.QFormLayout.ItemRole.FieldRole)
+                widget = input.widget()
+                widget.setEnabled(enable_scraping)
+
+        self._scrape_jpdb.stateChanged.connect(set_enable_scraping_options)
+
+        set_enable_scraping_options(False)
 
     def _setup_card_names(self):
         def jp_en_card_selected(name):
@@ -63,13 +139,18 @@ class ConfigGUI(aqt.qt.QDialog):
             self._config.en2jp_card_name = name
 
         self._en_card_name_input = aqt.qt.QComboBox()
-        self._en_card_name_input.setEditable(False)
-        self._en_card_name_input.setDisabled(True)
         self._en_card_name_input.currentTextChanged.connect(en_jp_card_selected)
+
+        # One row ahead of the checkbox, which hasn't yet been added
+        en_card_name_input_row = self._layout.rowCount() + 1
+        def set_use_en_cards(use_en_cards):
+            self._layout.setRowVisible(en_card_name_input_row, use_en_cards)
+            self._en_card_name_input.setEditable(use_en_cards)
+            self._en_card_name_input.setEnabled(use_en_cards)
 
         self._use_en_cards = aqt.qt.QCheckBox()
         self._use_en_cards.setChecked(False)
-        self._use_en_cards.stateChanged.connect(self._en_card_name_input.setEnabled)
+        self._use_en_cards.stateChanged.connect(set_use_en_cards)
         self._layout.addRow(
             aqt.qt.QLabel("Import English to Japanese cards?"),
             self._use_en_cards,
@@ -78,6 +159,7 @@ class ConfigGUI(aqt.qt.QDialog):
             aqt.qt.QLabel("English to Japanese Card"),
             self._en_card_name_input,
         )
+        set_use_en_cards(False)
 
     def _setup_review_file(self):
         def select_file():
@@ -149,6 +231,8 @@ class ConfigGUI(aqt.qt.QDialog):
         self._config.note_type_id = self._note_types[index].id
         model = self._mw.col.models.get(self._config.note_type_id)
 
+        # TODO: refresh field names on all inputs having to do with field names
+        #  i.e. also the scraping field configuration
         field_names = self._mw.col.models.field_names(model)
         self._reading_field_input.clear()
         self._reading_field_input.addItems(field_names)
@@ -161,7 +245,7 @@ class ConfigGUI(aqt.qt.QDialog):
         self._en_card_name_input.clear()
         self._en_card_name_input.addItems(card_templates)
         self._en_card_name_input.setEnabled(
-            bool(card_templates) and self._use_en_cards.isChecked())
+            bool(card_templates) and self._scrape_jpdb.isChecked())
         self._jp_card_name_input.clear()
         self._jp_card_name_input.setEnabled(bool(card_templates))
         self._jp_card_name_input.addItems(card_templates)
