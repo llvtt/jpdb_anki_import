@@ -237,8 +237,6 @@ class ConfigGUI(aqt.qt.QDialog):
         self._config.note_type_id = self._note_types[index].id
         model = self._mw.col.models.get(self._config.note_type_id)
 
-        # TODO: refresh field names on all inputs having to do with field names
-        #  i.e. also the scraping field configuration
         field_names = self._mw.col.models.field_names(model)
         for combobox in itertools.chain(
             [self._reading_field_input, self._expression_field_input],

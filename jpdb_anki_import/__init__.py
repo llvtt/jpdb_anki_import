@@ -3,7 +3,7 @@ from aqt import mw
 from aqt.qt import *
 from aqt.utils import showInfo
 
-from . import jpdb, importer, config
+from . import config, importer, scraper
 
 
 def check_initial_state() -> bool:
@@ -26,7 +26,10 @@ def import_jpdb() -> None:
         return
 
     print("scraping config", c.scraped_jpdb_field_mapping)
-    return
+
+    jpdb_scraper = None
+    if c.jpdb_cookie and c.scraped_jpdb_field_mapping:
+        jpdb_scraper = scraper.JPDBScraper(c.jpdb_cookie)
 
     try:
         imp = importer.JPDBImporter(c, mw)
