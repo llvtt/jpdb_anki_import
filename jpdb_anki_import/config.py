@@ -4,17 +4,9 @@ import pathlib
 
 from typing import Dict, List
 
+from . import scraper
+
 import aqt
-
-
-# TODO: These should match fields coming in from the Scraper
-JPDB_CARD_ROLES = [
-    # "spelling",
-    # "reading",
-    "glossary",
-    "notes",
-    "sentence",
-]
 
 
 @dataclasses.dataclass
@@ -71,7 +63,6 @@ class ConfigGUI(aqt.qt.QDialog):
         scrape_field.insertItems(1, anki_fields)
 
         def handle_selection(name):
-            print(f"setting {jpdb_field_name} to map to {name}")
             self.config.scraped_jpdb_field_mapping[jpdb_field_name] = name
 
         scrape_field.currentTextChanged.connect(handle_selection)
@@ -104,7 +95,8 @@ class ConfigGUI(aqt.qt.QDialog):
         )
         model = self._mw.col.models.get(self._config.note_type_id)
         anki_field_names = self._mw.col.models.field_names(model)
-        for jpdb_field in JPDB_CARD_ROLES:
+        scraper_fields = [field.name for field in dataclasses.fields(scraper.Word)]
+        for jpdb_field in scraper_fields:
             self._scrape_field_widgets.append(
                 self._setup_scrape_field(jpdb_field, anki_field_names),
             )
@@ -114,7 +106,7 @@ class ConfigGUI(aqt.qt.QDialog):
             if enable_scraping and anki_field_names:
                 # Set defaults
                 self.config.scraped_jpdb_field_mapping = {
-                    jpdb_field: anki_field_names[0] for jpdb_field in JPDB_CARD_ROLES
+                    jpdb_field: anki_field_names[0] for jpdb_field in scraper_fields
                 }
             else:
                 # Reset the mapping for scraped fields, so that we can use presence/absence

@@ -61,7 +61,6 @@ class JPDBImporter:
                     note_field = self.config.scraped_jpdb_field_mapping.get(jpdb_field)
                     if note_field and value is not None:
                         note[note_field] = value
-                        print(f"set {note_field} to {value}")
 
         self.anki.col.add_note(note, DeckId(self.config.deck_id))
 

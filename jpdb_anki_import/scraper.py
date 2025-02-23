@@ -1,12 +1,6 @@
 #!/usr/bin/env python
-import argparse
-import csv
 import dataclasses
-import functools
-import itertools
-import json
 import os
-import pathlib
 import re
 import sys
 import time
@@ -28,8 +22,6 @@ MAX_RETRIES = 3
 
 @dataclasses.dataclass
 class Word:
-    spelling: str
-    reading: Optional[str]
     glossary: str
     notes: Optional[str]
     sentence: Optional[str]
@@ -74,6 +66,7 @@ class JPDBScraper:
 
     @property
     def _headers(self) -> dict:
+        # TODO: this can probably be cleaned up a little bit
         return {
             "authority": "jpdb.io",
             "sec-ch-ua": "^^",
@@ -153,91 +146,7 @@ class JPDBScraper:
         glossary = f'<div class="glossary"><p class="pos">{pos}</p>{definitions}</div>'
 
         return Word(
-            spelling=word.spelling,
-            reading=word.reading,
             glossary=glossary,
             notes=notes,
             sentence=sentence,
         )
-
-
-@functools.cache
-def scraper():
-    return JPDBScraper(COOKIE)
-
-
-def collect_words(words: List[jpdb.Vocabulary]):
-    lookup = []
-    for i, word in enumerate(words, 1):
-        print(f"({i}/{len(words)}) looking up word {word.spelling}")
-        lookup.append(scraper().lookup_word(word))
-        time.sleep(1)
-
-    return lookup
-
-
-def build_csv(words: List[Word], output_filename: str) -> None:
-    pathlib.Path(output_filename).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_filename, "wt") as csvfile:
-        writer = csv.DictWriter(
-            csvfile,
-            fieldnames=[field.name for field in dataclasses.fields(Word)]
-        )
-        writer.writeheader()
-
-        for word in words:
-            writer.writerow(dataclasses.asdict(word))
-
-
-def review_words(jpdb_reviews: dict) -> List[jpdb.Vocabulary]:
-    return list({
-        jpdb.Vocabulary(
-            vid=entry["vid"],
-            spelling=entry["spelling"],
-            reading=entry["reading"],
-        )
-        for entry in itertools.chain(
-            jpdb_reviews["cards_vocabulary_jp_en"],
-            jpdb_reviews["cards_vocabulary_en_jp"],
-        )
-    })
-
-
-def create_reviews_csv(review_file: str, output: str, limit: Optional[int]):
-    with open(review_file) as f:
-        reviews = json.load(f)
-
-    words = review_words(reviews)
-    lookup = collect_words(words[:limit])
-    build_csv(lookup, output)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--review-file",
-        "-r",
-        help="JPDB review file JSON",
-        type=str,
-        default="review.json",
-    )
-    parser.add_argument(
-        "--output",
-        "-o",
-        help="Output file",
-        type=str,
-        default="jpdb_anki_reviews.csv",
-    )
-    parser.add_argument(
-        "--limit",
-        help="Maximum words to look up (useful for testing)",
-        type=int,
-        required=False,
-    )
-
-    args = parser.parse_args()
-    create_reviews_csv(
-        review_file=args.review_file,
-        output=args.output,
-        limit=args.limit,
-    )

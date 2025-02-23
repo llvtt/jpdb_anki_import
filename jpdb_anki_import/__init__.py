@@ -25,8 +25,6 @@ def import_jpdb() -> None:
     else:
         return
 
-    print("scraping config", c.scraped_jpdb_field_mapping)
-
     jpdb_scraper = None
     if c.jpdb_cookie and c.scraped_jpdb_field_mapping:
         jpdb_scraper = scraper.JPDBScraper(c.jpdb_cookie)
