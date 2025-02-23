@@ -9,8 +9,8 @@ import aqt
 
 # TODO: These should match fields coming in from the Scraper
 JPDB_CARD_ROLES = [
-    "spelling",
-    "reading",
+    # "spelling",
+    # "reading",
     "glossary",
     "notes",
     "sentence",
@@ -67,7 +67,8 @@ class ConfigGUI(aqt.qt.QDialog):
 
     def _setup_scrape_field(self, jpdb_field_name: str, anki_fields: List[str]):
         scrape_field = aqt.qt.QComboBox()
-        scrape_field.insertItems(0, anki_fields)
+        scrape_field.insertItem(0, "")
+        scrape_field.insertItems(1, anki_fields)
 
         def handle_selection(name):
             print(f"setting {jpdb_field_name} to map to {name}")

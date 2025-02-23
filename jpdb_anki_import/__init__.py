@@ -32,11 +32,11 @@ def import_jpdb() -> None:
         jpdb_scraper = scraper.JPDBScraper(c.jpdb_cookie)
 
     try:
-        imp = importer.JPDBImporter(c, mw)
+        imp = importer.JPDBImporter(c, mw, jpdb_scraper)
         stats = imp.run()
         showInfo(f'parsed {stats["parsed"]} vocabulary words from JPDB, created {stats["notes_created"]} notes')
-    except Exception:
-        raise Exception(f'could not parse {c.review_file}')
+    except Exception as e:
+        raise Exception(f'Could not import {c.review_file}') from e
 
 
 action = QAction('Import from JPDB', mw)

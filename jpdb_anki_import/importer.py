@@ -31,7 +31,7 @@ class JPDBImporter:
         self,
         conf: config.Config,
         anki: aqt.AnkiQt,
-        jpdb_scraper: Optional[scraper.JPDBScraper],
+        jpdb_scraper: Optional[scraper.JPDBScraper] = None,
     ):
         self.config = conf
         self.anki = anki
@@ -55,14 +55,15 @@ class JPDBImporter:
         else:
             note.fields[1] = vocab.reading
 
+        # print("field notes", note.fields)
         if self.jpdb_scraper is not None:
-            # TODO: could show some kind of progress/status here
             scraped = self.jpdb_scraper.lookup_word(vocab.spelling)
             if scraped:
                 for jpdb_field, value in scraped.as_dict().items():
                     note_field = self.config.scraped_jpdb_field_mapping.get(jpdb_field)
-                    if note_field:
+                    if note_field and value is not None:
                         note[note_field] = value
+                        print(f"set {note_field} to {value}")
 
         self.anki.col.add_note(note, DeckId(self.config.deck_id))
 
