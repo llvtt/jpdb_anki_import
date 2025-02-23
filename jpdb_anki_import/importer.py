@@ -38,7 +38,6 @@ class JPDBImporter:
         self.jpdb_scraper = jpdb_scraper
 
     def create_note(self, vocab: jpdb.Vocabulary) -> Note:
-        # TODO: in here, use the scraper to fill in details of the note, if available.
         note_model = (
             self.anki.col.models.get(self.config.note_type_id)
             or self.anki.col.models.current()
@@ -55,7 +54,6 @@ class JPDBImporter:
         else:
             note.fields[1] = vocab.reading
 
-        # print("field notes", note.fields)
         if self.jpdb_scraper is not None:
             scraped = self.jpdb_scraper.lookup_word(vocab)
             if scraped:
