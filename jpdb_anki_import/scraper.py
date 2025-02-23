@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'vendor'))
 import bs4
 
 
-MAX_RETRIES = 3
+MAX_RETRIES = 5
 
 
 @dataclasses.dataclass
@@ -98,12 +98,10 @@ class JPDBScraper:
             try:
                 with urllib.request.urlopen(request) as response:
                     return bs4.BeautifulSoup(response.read(), 'html.parser')
-            except urllib.error.HTTPError as e:
+            except urllib.error.URLError:
                 if i == MAX_RETRIES:
                     raise
-                if e.status == 429:
-                    time.sleep(i**2)
-                    continue
+                time.sleep(2**i)
         # This should not be reachable
         raise ParseError("Failed to contact JPDB")
 
