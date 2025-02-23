@@ -14,14 +14,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from typing import Optional, List, cast
+from typing import Optional, List
+
+from . import jpdb
 
 # vendor dependencies
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'vendor'))
 import bs4
 
-# e.g. sid=XXXXXX
-COOKIE = os.getenv("JPDB_COOKIE")
 
 MAX_RETRIES = 3
 
@@ -70,7 +70,7 @@ class JPDBScraper:
 
     def _strip_furigana(self, tag):
         """Return text content of the tag without furigana."""
-        return ''.join(self._japanese_strings(tag))
+        return ''.join(self._japanese_strings(tag)).strip()
 
     @property
     def _headers(self) -> dict:
@@ -92,9 +92,10 @@ class JPDBScraper:
             "if-none-match": "^^",
         }
 
-    def _word_soup(self, spelling) -> bs4.BeautifulSoup:
-        encoded_spelling = urllib.parse.quote(spelling, encoding='utf-8')
-        url = f"https://jpdb.io/search?q={encoded_spelling}&lang=english#a"
+    def _word_soup(self, word: jpdb.Vocabulary) -> bs4.BeautifulSoup:
+        encoded_spelling = urllib.parse.quote(word.spelling, encoding='utf-8')
+        encoded_reading = urllib.parse.quote(word.reading, encoding='utf-8')
+        url = f"https://jpdb.io/vocabulary/{word.vid}/{encoded_spelling}/{encoded_reading}?lang=english#a"
         request = urllib.request.Request(
             url=url,
             method='GET',
@@ -113,17 +114,8 @@ class JPDBScraper:
         # This should not be reachable
         raise ParseError("Failed to contact JPDB")
 
-    def lookup_word(self, spelling) -> Word:
-        soup = self._word_soup(spelling)
-
-        # reading
-        accent_section = soup.find('div', class_='subsection-pitch-accent')
-        reading = None
-        if isinstance(accent_section, bs4.element.Tag):
-            accent_content = accent_section.find('div', class_='subsection')
-            if accent_content:
-                # There may be multiple pitch accents listed.
-                reading = cast(bs4.element.Tag, accent_content.contents[0]).contents[0].text
+    def lookup_word(self, word: jpdb.Vocabulary) -> Word:
+        soup = self._word_soup(word)
 
         # meanings
         meanings = soup.find('div', class_='subsection-meanings')
@@ -144,7 +136,7 @@ class JPDBScraper:
         # custom definition (may not be present)
         custom_meaning = meanings.find('div', class_='custom-meaning')
         if custom_meaning:
-            notes = "".join(str(element) for element in custom_meaning.contents)
+            notes = "".join(str(element) for element in custom_meaning.contents).strip()
         else:
             notes = None
 
@@ -161,8 +153,8 @@ class JPDBScraper:
         glossary = f'<div class="glossary"><p class="pos">{pos}</p>{definitions}</div>'
 
         return Word(
-            spelling=spelling,
-            reading=reading,
+            spelling=word.spelling,
+            reading=word.reading,
             glossary=glossary,
             notes=notes,
             sentence=sentence,
@@ -174,10 +166,10 @@ def scraper():
     return JPDBScraper(COOKIE)
 
 
-def collect_words(words: List[str]):
+def collect_words(words: List[jpdb.Vocabulary]):
     lookup = []
     for i, word in enumerate(words, 1):
-        print(f"({i}/{len(words)}) looking up word {word}")
+        print(f"({i}/{len(words)}) looking up word {word.spelling}")
         lookup.append(scraper().lookup_word(word))
         time.sleep(1)
 
@@ -197,26 +189,25 @@ def build_csv(words: List[Word], output_filename: str) -> None:
             writer.writerow(dataclasses.asdict(word))
 
 
-def review_words(jpdb_reviews: dict) -> List[str]:
+def review_words(jpdb_reviews: dict) -> List[jpdb.Vocabulary]:
     return list({
-        entry["spelling"] for entry in itertools.chain(
+        jpdb.Vocabulary(
+            vid=entry["vid"],
+            spelling=entry["spelling"],
+            reading=entry["reading"],
+        )
+        for entry in itertools.chain(
             jpdb_reviews["cards_vocabulary_jp_en"],
             jpdb_reviews["cards_vocabulary_en_jp"],
         )
     })
 
 
-def create_reviews_csv(review_file: str, prev_review_file: Optional[str], output: str, limit: Optional[int]):
+def create_reviews_csv(review_file: str, output: str, limit: Optional[int]):
     with open(review_file) as f:
         reviews = json.load(f)
 
     words = review_words(reviews)
-
-    if prev_review_file:
-        with open(prev_review_file) as pf:
-            previous_reviews = json.load(pf)
-        words -= review_words(previous_reviews)
-
     lookup = collect_words(words[:limit])
     build_csv(lookup, output)
 
@@ -229,14 +220,6 @@ if __name__ == '__main__':
         help="JPDB review file JSON",
         type=str,
         default="review.json",
-    )
-    parser.add_argument(
-        "--prev-review-file",
-        "-p",
-        help="Previous JPDB review file JSON. Words already present in this file won't be "
-             "included in the final output.",
-        type=str,
-        required=False,
     )
     parser.add_argument(
         "--output",
@@ -255,7 +238,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     create_reviews_csv(
         review_file=args.review_file,
-        prev_review_file=args.prev_review_file,
         output=args.output,
         limit=args.limit,
     )

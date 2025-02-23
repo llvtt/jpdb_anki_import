@@ -9,7 +9,7 @@ class Review:
 
     @classmethod
     def from_dict(cls, d):
-        return cls(timestamp=d['timestamp'], grade=d['grade'])
+        return cls(timestamp=d["timestamp"], grade=d["grade"])
 
 
 @dataclasses.dataclass
@@ -20,33 +20,45 @@ class Vocabulary:
     en_jp_reviews: list[Review] = dataclasses.field(default_factory=list)
     jp_en_reviews: list[Review] = dataclasses.field(default_factory=list)
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        return (
+            self.vid == other.vid
+            and self.spelling == other.spelling
+            and self.reading == other.reading
+        )
+
+    def __hash__(self):
+        return hash(self.vid)
+
     @classmethod
     def parse(cls, filename) -> list:
-        with open(filename, 'rb') as review_file:
+        with open(filename, "rb") as review_file:
             reviews = json.load(review_file)
 
         by_vid = {}
-        for vocab in reviews.get('cards_vocabulary_en_jp', []):
-            vid = vocab['vid']
+        for vocab in reviews.get("cards_vocabulary_en_jp", []):
+            vid = vocab["vid"]
             by_vid[vid] = cls(
                 vid=vid,
-                spelling=vocab['spelling'],
-                reading=vocab['reading'],
-                en_jp_reviews=cls._build_reviews(vocab['reviews'])
+                spelling=vocab["spelling"],
+                reading=vocab["reading"],
+                en_jp_reviews=cls._build_reviews(vocab["reviews"]),
             )
 
-        for vocab in reviews.get('cards_vocabulary_jp_en', []):
-            vid = vocab['vid']
-            reviews = cls._build_reviews(vocab['reviews'])
+        for vocab in reviews.get("cards_vocabulary_jp_en", []):
+            vid = vocab["vid"]
+            reviews = cls._build_reviews(vocab["reviews"])
 
             if vid in by_vid:
                 by_vid[vid].jp_en_reviews = reviews
             else:
                 by_vid[vid] = cls(
                     vid=vid,
-                    spelling=vocab['spelling'],
-                    reading=vocab['reading'],
-                    jp_en_reviews=reviews
+                    spelling=vocab["spelling"],
+                    reading=vocab["reading"],
+                    jp_en_reviews=reviews,
                 )
 
         return list(by_vid.values())

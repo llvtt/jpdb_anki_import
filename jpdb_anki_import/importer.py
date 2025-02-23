@@ -57,7 +57,7 @@ class JPDBImporter:
 
         # print("field notes", note.fields)
         if self.jpdb_scraper is not None:
-            scraped = self.jpdb_scraper.lookup_word(vocab.spelling)
+            scraped = self.jpdb_scraper.lookup_word(vocab)
             if scraped:
                 for jpdb_field, value in scraped.as_dict().items():
                     note_field = self.config.scraped_jpdb_field_mapping.get(jpdb_field)
