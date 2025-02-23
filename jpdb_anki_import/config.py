@@ -56,8 +56,8 @@ class ConfigGUI(aqt.qt.QDialog):
         self._setup_review_file()
         self._setup_deck_name()
         self._setup_note_type()
-        self._setup_reading_field()
         self._setup_expression_field()
+        self._setup_reading_field()
         self._setup_card_names()
         self._setup_scraping_options()
         self._setup_cta_buttons()
@@ -87,6 +87,7 @@ class ConfigGUI(aqt.qt.QDialog):
 
         def jpdb_cookie_changed(cookie):
             self.config.jpdb_cookie = cookie
+            self._validate()
 
         scraping_start_row = self._layout.rowCount()
         self._jpdb_cookie = aqt.qt.QLineEdit()
@@ -108,7 +109,7 @@ class ConfigGUI(aqt.qt.QDialog):
             )
         scraping_end_row = self._layout.rowCount()
 
-        def set_enable_scraping_options(enable_scraping):
+        def set_enable_scraping_options(enable_scraping, validate=True):
             if enable_scraping and anki_field_names:
                 # Set defaults
                 self.config.scraped_jpdb_field_mapping = {
@@ -125,9 +126,12 @@ class ConfigGUI(aqt.qt.QDialog):
                 widget = input.widget()
                 widget.setEnabled(enable_scraping)
 
+            if validate:
+                self._validate()
+
         self._scrape_jpdb.stateChanged.connect(set_enable_scraping_options)
 
-        set_enable_scraping_options(False)
+        set_enable_scraping_options(False, validate=False)
 
     def _setup_card_names(self):
         def jp_en_card_selected(name):
@@ -180,12 +184,20 @@ class ConfigGUI(aqt.qt.QDialog):
 
             self._selected_file_label.setText(path)
             self._config.review_file = path
-            self._set_ok_enabled(True)
+            self._validate()
 
         button = aqt.qt.QPushButton("Open")
         button.clicked.connect(select_file)
         self._selected_file_label = aqt.qt.QLabel("Select JPDB review JSON file")
         self._layout.addRow(button, self._selected_file_label)
+
+    def _validate(self):
+        valid = True
+        if not self.config.review_file:
+            valid = False
+        if self._scrape_jpdb.isChecked() and not self.config.jpdb_cookie:
+            valid = False
+        self._set_ok_enabled(valid)
 
     def _set_ok_enabled(self, enabled):
         ok = self._buttons.button(aqt.qt.QDialogButtonBox.StandardButton.Ok)

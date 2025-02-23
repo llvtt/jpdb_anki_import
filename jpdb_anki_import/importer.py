@@ -2,6 +2,7 @@
 Create Notes and Cards in Anki for JPDB vocabulary cards.
 """
 
+from dataclasses import asdict
 from typing import Optional, Tuple
 
 import aqt.qt
@@ -55,10 +56,13 @@ class JPDBImporter:
             note.fields[1] = vocab.reading
 
         if self.jpdb_scraper is not None:
+            # TODO: could show some kind of progress/status here
             scraped = self.jpdb_scraper.lookup_word(vocab.spelling)
             if scraped:
-                # TODO: splat this out onto the note somehow
-                pass
+                for jpdb_field, value in scraped.as_dict().items():
+                    note_field = self.config.scraped_jpdb_field_mapping.get(jpdb_field)
+                    if note_field:
+                        note[note_field] = value
 
         self.anki.col.add_note(note, DeckId(self.config.deck_id))
 
@@ -135,6 +139,7 @@ class JPDBImporter:
         notes_created = 0
         for i, vocab in enumerate(vocabulary):
             progress.setValue(i)
+            progress.setLabelText(vocab.spelling)
             if progress.wasCanceled():
                 break
 

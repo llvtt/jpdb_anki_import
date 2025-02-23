@@ -34,6 +34,9 @@ class Word:
     notes: Optional[str]
     sentence: Optional[str]
 
+    def as_dict(self):
+        return dataclasses.asdict(self)
+
 
 class ParseError(Exception):
     pass
