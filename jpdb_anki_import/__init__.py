@@ -8,8 +8,10 @@ from . import config, importer, scraper
 
 def check_initial_state() -> bool:
     if not mw.col.v3_scheduler():
-        showInfo('This plugin only works with Anki v3 scheduler. '
-                 'Please enable this under the "Scheduling" tab under Anki general settings.')
+        showInfo(
+            "This plugin only works with Anki v3 scheduler. "
+            'Please enable this under the "Scheduling" tab under Anki general settings.'
+        )
         return False
 
     return True
@@ -32,11 +34,13 @@ def import_jpdb() -> None:
     try:
         imp = importer.JPDBImporter(c, mw, jpdb_scraper)
         stats = imp.run()
-        showInfo(f'parsed {stats["parsed"]} vocabulary words from JPDB, created {stats["notes_created"]} notes')
+        showInfo(
+            f'parsed {stats["parsed"]} vocabulary words from JPDB, created {stats["notes_created"]} notes'
+        )
     except Exception as e:
-        raise Exception(f'Could not import {c.review_file}') from e
+        raise Exception(f"Could not import {c.review_file}") from e
 
 
-action = QAction('Import from JPDB', mw)
+action = QAction("Import from JPDB", mw)
 qconnect(action.triggered, import_jpdb)
 mw.form.menuTools.addAction(action)

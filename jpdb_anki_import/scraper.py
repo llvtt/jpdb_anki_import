@@ -13,7 +13,7 @@ from typing import Optional, List
 from . import jpdb
 
 # vendor dependencies
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'vendor'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "vendor"))
 import bs4
 
 
@@ -36,10 +36,7 @@ class ParseError(Exception):
 
 def strings_to_html_list(strings: List[str]) -> str:
     pattern = re.compile(r"^\d\. ")
-    elements = (
-        f"<li>{re.sub(pattern, '', element)}</li>"
-        for element in strings
-    )
+    elements = (f"<li>{re.sub(pattern, '', element)}</li>" for element in strings)
     return f"<ol>{''.join(elements)}</ol>"
 
 
@@ -54,7 +51,7 @@ class JPDBScraper:
         for child in tag_with_text.children:
             if isinstance(child, str):
                 yield child
-            elif child.name == 'rt':
+            elif child.name == "rt":
                 # Furigana
                 pass
             else:
@@ -62,7 +59,7 @@ class JPDBScraper:
 
     def _strip_furigana(self, tag):
         """Return text content of the tag without furigana."""
-        return ''.join(self._japanese_strings(tag)).strip()
+        return "".join(self._japanese_strings(tag)).strip()
 
     @property
     def _headers(self) -> dict:
@@ -86,18 +83,18 @@ class JPDBScraper:
         }
 
     def _word_soup(self, word: jpdb.Vocabulary) -> bs4.BeautifulSoup:
-        encoded_spelling = urllib.parse.quote(word.spelling, encoding='utf-8')
-        encoded_reading = urllib.parse.quote(word.reading, encoding='utf-8')
+        encoded_spelling = urllib.parse.quote(word.spelling, encoding="utf-8")
+        encoded_reading = urllib.parse.quote(word.reading, encoding="utf-8")
         url = f"https://jpdb.io/vocabulary/{word.vid}/{encoded_spelling}/{encoded_reading}?lang=english#a"
         request = urllib.request.Request(
             url=url,
-            method='GET',
+            method="GET",
             headers=self._headers,
         )
-        for i in range(MAX_RETRIES+1):
+        for i in range(MAX_RETRIES + 1):
             try:
                 with urllib.request.urlopen(request) as response:
-                    return bs4.BeautifulSoup(response.read(), 'html.parser')
+                    return bs4.BeautifulSoup(response.read(), "html.parser")
             except urllib.error.URLError:
                 if i == MAX_RETRIES:
                     raise
@@ -109,30 +106,30 @@ class JPDBScraper:
         soup = self._word_soup(word)
 
         # meanings
-        meanings = soup.find('div', class_='subsection-meanings')
+        meanings = soup.find("div", class_="subsection-meanings")
         if not isinstance(meanings, bs4.element.Tag):
             raise ParseError("could not find subsection-meanings")
 
         definitions = [
             " ".join(meaning.strings)
-            for meaning in meanings.find_all('div', class_='description')
+            for meaning in meanings.find_all("div", class_="description")
         ]
 
         # part of speech
-        pos_section = meanings.find('div', class_='part-of-speech')
+        pos_section = meanings.find("div", class_="part-of-speech")
         if not isinstance(pos_section, bs4.element.Tag):
             raise ParseError("could not find part-of-speech section")
         pos_list = [pos.text for pos in pos_section.children]
 
         # custom definition (may not be present)
-        custom_meaning = meanings.find('div', class_='custom-meaning')
+        custom_meaning = meanings.find("div", class_="custom-meaning")
         if custom_meaning:
             notes = "".join(str(element) for element in custom_meaning.contents).strip()
         else:
             notes = None
 
         # custom sentence (may not be present)
-        sentence_section = soup.find('div', class_='card-sentence')
+        sentence_section = soup.find("div", class_="card-sentence")
         if sentence_section:
             sentence = self._strip_furigana(sentence_section)
         else:
