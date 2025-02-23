@@ -9,6 +9,9 @@ from . import scraper
 import aqt
 
 
+COOKIE_HELP = "https://github.com/llvtt/jpdb_anki_import/wiki/Finding-your-JPDB-cookie"
+
+
 @dataclasses.dataclass
 class Config:
     review_file: str = ""
@@ -84,9 +87,8 @@ class ConfigGUI(aqt.qt.QDialog):
         scraping_start_row = self._layout.rowCount()
         self._jpdb_cookie = aqt.qt.QLineEdit()
         self._jpdb_cookie.textEdited.connect(jpdb_cookie_changed)
-        # TODO: create a help file and link to it here
         jpdb_cookie_label = aqt.qt.QLabel(
-            'JPDB Cookie <a href="https://github.com/llvtt/jpdb_anki_import">(?)</a>'
+            f'JPDB Cookie <a href="{COOKIE_HELP}">(?)</a>'
         )
         jpdb_cookie_label.setOpenExternalLinks(True)
         self._layout.addRow(
