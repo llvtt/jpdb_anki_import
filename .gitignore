@@ -1,2 +1,7 @@
 jpdb_anki_import.ankiaddon
 .venv
+reviews.json
+jpdb_anki_import/vendor/*
+__pycache__/*
+**/__pycache__/*
+.mypy_cache/*
