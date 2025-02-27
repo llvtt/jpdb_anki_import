@@ -1,34 +1,47 @@
 """
 Create Notes and Cards in Anki for JPDB vocabulary cards.
 """
+
+from dataclasses import asdict
+from typing import Optional, Tuple
+
 import aqt.qt
 from anki.cards import Card
 from anki.decks import DeckId
 from anki.notes import Note
 from anki.scheduler.v3 import CardAnswer
 
-from . import jpdb, config
+from . import config, jpdb, scraper
 
 JPDB_TO_CARD_ANSWER = {
-    'okay': CardAnswer.GOOD,
-    'known': CardAnswer.GOOD,
-    'unknown': CardAnswer.AGAIN,
-    'hard': CardAnswer.HARD,
-    'something': CardAnswer.AGAIN,
-    'fail': CardAnswer.AGAIN,
-    'nothing': CardAnswer.AGAIN,
-    'easy': CardAnswer.EASY,
-    'pass': CardAnswer.GOOD,
+    "okay": CardAnswer.GOOD,
+    "known": CardAnswer.GOOD,
+    "unknown": CardAnswer.AGAIN,
+    "hard": CardAnswer.HARD,
+    "something": CardAnswer.AGAIN,
+    "fail": CardAnswer.AGAIN,
+    "nothing": CardAnswer.AGAIN,
+    "easy": CardAnswer.EASY,
+    "pass": CardAnswer.GOOD,
 }
 
 
 class JPDBImporter:
-    def __init__(self, conf: config.Config, anki: aqt.AnkiQt):
+    def __init__(
+        self,
+        conf: config.Config,
+        anki: aqt.AnkiQt,
+        jpdb_scraper: Optional[scraper.JPDBScraper] = None,
+    ):
         self.config = conf
         self.anki = anki
+        self.jpdb_scraper = jpdb_scraper
 
     def create_note(self, vocab: jpdb.Vocabulary) -> Note:
-        note_model = self.anki.col.models.get(self.config.note_type_id) or self.anki.col.models.current()
+        note_model = (
+            self.anki.col.models.get(self.config.note_type_id)
+            or self.anki.col.models.current()
+        )
         note = self.anki.col.new_note(note_model)
 
         if self.config.expression_field in note:
@@ -40,13 +53,24 @@ class JPDBImporter:
             note[self.config.reading_field] = vocab.reading
         else:
             note.fields[1] = vocab.reading
+
+        if self.jpdb_scraper is not None:
+            scraped = self.jpdb_scraper.lookup_word(vocab)
+            if scraped:
+                for jpdb_field, value in scraped.as_dict().items():
+                    note_field = self.config.scraped_jpdb_field_mapping.get(jpdb_field)
+                    if note_field and value is not None:
+                        note[note_field] = value
+
         self.anki.col.add_note(note, DeckId(self.config.deck_id))
 
         return note
 
-    def card_state_current_next(self, card: Card, rating: str) -> (CardAnswer, CardAnswer):
+    def card_state_current_next(
+        self, card: Card, rating: str
+    ) -> Tuple[CardAnswer, CardAnswer]:
         # The following code is taken directly from the Anki v3 scheduler
-        if hasattr(self.anki.col.backend, 'get_scheduling_states'):
+        if hasattr(self.anki.col.backend, "get_scheduling_states"):
             states = self.anki.col.backend.get_scheduling_states(card.id)
         else:
             # Anki < 2.1.60
@@ -83,7 +107,7 @@ class JPDBImporter:
         jp_en_card = None
         en_jp_card = None
         for card in note.cards():
-            template_name = card.template()['name']
+            template_name = card.template()["name"]
             if template_name == self.config.jp2en_card_name:
                 jp_en_card = card
             elif template_name == self.config.en2jp_card_name:
@@ -100,9 +124,11 @@ class JPDBImporter:
             self.backfill_reviews(note.cards()[0], vocab.jp_en_reviews)
 
     def create_notes(self, vocabulary: list[jpdb.Vocabulary]) -> int:
-        progress = aqt.qt.QProgressDialog('Importing from JPDB', 'Cancel', 0, len(vocabulary), self.anki)
+        progress = aqt.qt.QProgressDialog(
+            "Importing from JPDB", "Cancel", 0, len(vocabulary), self.anki
+        )
         bar = aqt.qt.QProgressBar(progress)
-        bar.setFormat('%v/%m')
+        bar.setFormat("%v/%m")
         bar.setMaximum(len(vocabulary))
         progress.setBar(bar)
         progress.setMinimumDuration(1000)
@@ -111,6 +137,7 @@ class JPDBImporter:
         notes_created = 0
         for i, vocab in enumerate(vocabulary):
             progress.setValue(i)
+            progress.setLabelText(vocab.spelling)
             if progress.wasCanceled():
                 break
 
@@ -127,8 +154,8 @@ class JPDBImporter:
     def run(self) -> dict:
         vocabulary = jpdb.Vocabulary.parse(self.config.review_file)
         stats = {
-            'parsed': len(vocabulary),
-            'notes_created': self.create_notes(vocabulary),
+            "parsed": len(vocabulary),
+            "notes_created": self.create_notes(vocabulary),
         }
         self.anki.overview.refresh()
         return stats

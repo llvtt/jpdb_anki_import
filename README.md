@@ -9,18 +9,15 @@ This plugin imports the following information:
 * Japanese reading (e.g. ことば)
 * Review history, accomplished by simulating the same button answer responses in Anki.
 
-This plugin *does not* import:
-* English definitions
-* Custom sentences
-* Audio
-* Pitch accent
+There's also an experimental option to scrape your existing cards in JPDB for more information that can be enabled in the
+setup window. This allows importing:
 
-These data are not included in the JPDB review history export, so they are not included.
-If/when JPDB has a public API, I will look into adding support, but for now this plugin 
-is meant to create a good starting point in Anki for studying words previously added to JPDB,
-so that other richer media (e.g. pictures, video, etc) can be added later.
-See the "Recommended Additional Plugins" section below for links to some other Anki add-ons that can help
-make the resulting cards richer with little effort.
+* Card definitions
+* Custom sentence
+* Notes
+
+This plugin *does not* import audio or pitch accent, but see the "Recommended Additional Plugins" section for some tips
+on plugins that can generate these for you!
 
 ## Usage
 
