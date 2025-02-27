@@ -63,7 +63,6 @@ class JPDBScraper:
 
     @property
     def _headers(self) -> dict:
-        # TODO: this can probably be cleaned up a little bit
         return {
             "authority": "jpdb.io",
             "sec-ch-ua": "^^",
